@@ -1,22 +1,22 @@
 # Changelog
 
 ## 0.4.0
-- Oberfläche auf Englisch. Deutsche Spiel-Clients sehen weiterhin alles auf Deutsch.
-- Neuer Befehl `/fsmith armor` (das alte `/fsmith ruestung` geht weiter).
+- The interface is now in English. German game clients still show everything in German.
+- New command `/fsmith armor` (the old `/fsmith ruestung` still works).
 
 ## 0.3.0
-- Neuer Name: **Friendsmith** (vorher Zunftschmiede). Befehle jetzt `/fsmith` bzw. `/friendsmith`.
-- Bewertung nach Spezialisierung: Sobald Talentpunkte verteilt sind, werden die Werte des Gegenstands
-  nach Spec gewichtet und mit dem getragenen Teil verglichen (inkl. Zufallswerten wie „… des Affen“).
-  Pro Charakter umstellbar, ohne Talente weiter nach Itemlevel.
-- Zauber-Ausrüstung für Nahkämpfer und Nahkampf-Ausrüstung für Zauberer wird nicht mehr vorgeschlagen.
-- Addon-Button mit eigenem Logo: Broker-Leisten (Titan Panel, ChocolateBar, …), Minimap und Addon-Menü.
+- New name: **Friendsmith** (formerly Zunftschmiede). Commands are now `/fsmith` and `/friendsmith`.
+- Spec-aware ratings: once talent points are spent, item stats are weighted for the character's spec
+  and compared with the equipped item (including random suffixes like "… of the Monkey").
+  Can be changed per character; without talents, item level is used.
+- Caster gear is no longer suggested to melee classes, and melee gear is no longer suggested to casters.
+- Addon button with its own logo: broker bars (Titan Panel, ChocolateBar, …), minimap and addon compartment.
 
 ## 0.2.0
-- Neues Fenster: Seitenleiste mit „Für mich“, „Ich kann craften“ und „Ganze Gilde“,
-  einklappbare Liste wie im Berufsfenster, Detailbereich mit Vergleich und Flüster-Knöpfen, Suche.
-- Leiste am Berufsfenster: „Upgrades für dich / <Twink> / <Gildenmitglied>“ aus dem offenen Beruf.
-- Beim Aufheben gebundene Teile werden nur dem Handwerker selbst vorgeschlagen.
+- New window: sidebar with "For me", "I can craft" and "Whole guild",
+  a collapsible list like the profession window, a detail pane with comparison and whisper buttons, and a search box.
+- Panel next to the profession window: "Upgrades for you / <alt> / <guildmate>" from the open profession.
+- Bind-on-pickup items are only suggested to the crafter themselves.
 
 ## 0.1.0
-- Erste Version: Ausrüstung und Rezepte erfassen, über die Gilde austauschen, Upgrades nach Itemlevel.
+- First version: records gear and recipes, shares them with the guild, rates upgrades by item level.
