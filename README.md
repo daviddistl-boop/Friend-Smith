@@ -86,3 +86,9 @@ In the window: click for details, Shift-click to link in chat, Ctrl-click to try
   If you run into a Lua error, turn on error messages with `/console scriptErrors 1` and include the error text in your report.
 - Friendsmith doesn't send or calculate anything during combat.
 - Want to add a language? Add a block to `Locales.lua`.
+
+## Contributing & license
+Ideas, bug reports and pull requests are welcome on GitHub. Every change is reviewed before it goes into a release,
+and only the official CurseForge project publishes Friendsmith releases.
+
+Friendsmith is released under the [MIT License](LICENSE).

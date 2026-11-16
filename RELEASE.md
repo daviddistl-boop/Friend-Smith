@@ -7,7 +7,7 @@
    `/console scriptErrors 1` spielen: Fenster, Berufsfenster-Leiste, Minimap-Button, Sync mit einem Gildenmitglied.
 3. **CurseForge-Projekt anlegen:** https://authors.curseforge.com → *Create Project* → World of Warcraft → Addon.
    - Name: Friendsmith, Kategorie: Professions (ggf. zusätzlich Guild)
-   - Lizenz auswählen (z. B. MIT oder All Rights Reserved – deine Entscheidung)
+   - Lizenz: MIT (passend zur LICENSE-Datei)
    - Projektbild: `assets/logo-400.png`
    - Beschreibung: Text aus `CURSEFORGE.md`
    - Spielversion: die passende WoW-Forever/Classic-Variante
