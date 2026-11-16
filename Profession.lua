@@ -3,6 +3,7 @@
 -- Klick oeffnet das Rezept im Berufsfenster, wie bei einer normalen Rezeptzeile.
 
 local ADDON, ns = ...
+local L = ns.L
 
 local P_W, P_H, ROW_H = 260, 420, 20
 local panel
@@ -110,8 +111,8 @@ local function Render()
             r.gain:SetShown(not hdr)
             if hdr then
                 r.exp:SetTexture(it.closed and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
-                local who = (it.key == ns.PlayerKey()) and "dich" or st.CharName(it.key)
-                r.text:SetText("Upgrades für " .. who)
+                local who = (it.key == ns.PlayerKey()) and L["you"] or st.CharName(it.key)
+                r.text:SetText(L["Upgrades for "] .. who)
                 r.text:SetTextColor(st.C.gold[1], st.C.gold[2], st.C.gold[3])
                 r.text:SetPoint("LEFT", 22, 0)
                 r.count:SetText(it.n)
@@ -119,7 +120,7 @@ local function Render()
                 local e = it.e
                 local d = ns.ItemData(e.itemID)
                 r.icon:SetTexture(d and d.icon or st.EMPTY_ICON)
-                r.text:SetText(d and d.name or "Lade …")
+                r.text:SetText(d and d.name or L["Loading …"])
                 r.text:SetTextColor(st.QualityColor(d and d.quality))
                 r.text:SetPoint("LEFT", 42, 0)
                 r.gain:SetText(st.DiffText(e))
@@ -140,9 +141,9 @@ function ns.RefreshProfPanel()
     offset = math.min(offset, maxOff)
     panel.count:SetText(total > 0 and total or "")
     if linked then
-        panel.empty:SetText("Fremder Beruf – hier werden nur deine eigenen Rezepte ausgewertet.")
+        panel.empty:SetText(L["Someone else's profession – only your own recipes are evaluated here."])
     else
-        panel.empty:SetText("Mit diesem Beruf kannst du gerade niemandem etwas Besseres craften.\n\nIm Friendsmith-Fenster siehst du, wer dir etwas craften kann.")
+        panel.empty:SetText(L["With this profession you can't craft anyone an upgrade right now.\n\nThe Friendsmith window shows who can craft something for you."])
     end
     panel.empty:SetShown(#flat == 0)
     panel:Show()
@@ -204,14 +205,14 @@ local function Create(host)
     panel.count = st.Text(head, 11, C.green)
     panel.count:SetPoint("LEFT", title, "RIGHT", 6, 0)
 
-    local open = st.MakeButton(head, 56, 20, "Fenster")
+    local open = st.MakeButton(head, 56, 20, L["Window"])
     open:SetPoint("RIGHT", -6, 0)
     open.label:SetFont(st.FONT, 10, "")
     open:SetScript("OnClick", function() ns.OpenUI("mine") end)
     open:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Friendsmith öffnen", 1, 1, 1)
-        GameTooltip:AddLine("Dort siehst du auch, wer dir etwas craften kann.", nil, nil, nil, true)
+        GameTooltip:AddLine(L["Open Friendsmith"], 1, 1, 1)
+        GameTooltip:AddLine(L["It also shows who can craft something for you."], nil, nil, nil, true)
         GameTooltip:Show()
     end)
     open:HookScript("OnLeave", function() GameTooltip:Hide() end)
@@ -267,7 +268,7 @@ local function Create(host)
             local it = self.item
             if it and it.kind == "i" and ns.ShowEntryTooltip then
                 ns.ShowEntryTooltip(self, it.e)
-                GameTooltip:AddLine("Rechtsklick: im Friendsmith-Fenster zeigen", 0.6, 0.6, 0.6)
+                GameTooltip:AddLine(L["Right-click: show in the Friendsmith window"], 0.6, 0.6, 0.6)
                 GameTooltip:Show()
             end
         end)
@@ -288,7 +289,7 @@ local function Create(host)
 
     local foot = st.Text(panel, 9, C.muted, "CENTER")
     foot:SetPoint("BOTTOM", 0, 8)
-    foot:SetText("Klick: Rezept öffnen  ·  Shift: verlinken")
+    foot:SetText(L["Click: open recipe  ·  Shift: link"])
 
     Place(host)
 end

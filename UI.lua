@@ -2,6 +2,7 @@
 -- Aufbau: Kopfzeile (Suche) | Seitenleiste (Ansicht, Filter) | Liste wie im Berufsfenster | Details
 
 local ADDON, ns = ...
+local L = ns.L
 
 ---------------------------------------------------------------------------
 -- Stil
@@ -30,10 +31,10 @@ local ROW_H = 22
 local MAX_CRAFTER_ROWS = 5
 
 local SLOT_NAMES = {
-    [1] = "Kopf", [2] = "Hals", [3] = "Schulter", [5] = "Brust", [6] = "Taille",
-    [7] = "Beine", [8] = "Füße", [9] = "Handgelenke", [10] = "Hände",
-    [11] = "Finger", [12] = "Finger", [13] = "Schmuck", [14] = "Schmuck",
-    [15] = "Rücken", [16] = "Waffenhand", [17] = "Schildhand", [18] = "Distanz",
+    [1] = L["Head"], [2] = L["Neck"], [3] = L["Shoulder"], [5] = L["Chest"], [6] = L["Waist"],
+    [7] = L["Legs"], [8] = L["Feet"], [9] = L["Wrist"], [10] = L["Hands"],
+    [11] = "Finger", [12] = "Finger", [13] = L["Trinket"], [14] = L["Trinket"],
+    [15] = L["Back"], [16] = L["Main Hand"], [17] = L["Off Hand"], [18] = L["Ranged"],
 }
 
 ---------------------------------------------------------------------------
@@ -180,13 +181,13 @@ local function LevelClass(key)
     local r = Rec(key)
     if not r then return "" end
     local cls = r.class and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[r.class] or r.class or ""
-    return string.format("Stufe %s %s", r.level or "?", cls)
+    return string.format(L["Level %s %s"], r.level or "?", cls)
 end
 
 local function Tag(key)
-    if key == ns.PlayerKey() then return "|cfff2852eDu|r" end
-    if IsMine(key) then return "|cff7fb2ffTwink|r" end
-    return "|cff8f96a8Gilde|r"
+    if key == ns.PlayerKey() then return "|cfff2852e" .. L["You"] .. "|r" end
+    if IsMine(key) then return "|cff7fb2ff" .. L["Alt"] .. "|r" end
+    return "|cff8f96a8" .. L["Guild"] .. "|r"
 end
 
 local function QualityColor(q)
@@ -231,7 +232,7 @@ end
 
 -- kurz fuer Listen: "+5", "+12%", "neu"
 local function DiffText(e)
-    if not e.cur then return "neu" end
+    if not e.cur then return L["new"] end
     if e.pct and e.pct >= 999 then return "++" end
     if e.mode == "stat" then return "+" .. e.pct .. "%" end
     return "+" .. e.diff
@@ -239,10 +240,10 @@ end
 
 -- lang fuer Texte: "+5 iLvl", "+12 % besser"
 local function GainText(e)
-    if not e.cur then return "freier Platz" end
+    if not e.cur then return L["empty slot"] end
     if e.mode == "stat" then
-        if e.pct >= 999 then return "deutlich besser" end
-        return "+" .. e.pct .. " % besser"
+        if e.pct >= 999 then return L["much better"] end
+        return string.format(L["+%d%% better"], e.pct)
     end
     return "+" .. e.diff .. " iLvl"
 end
@@ -353,13 +354,13 @@ function Rebuild()
     list.empty:SetShown(#flat == 0)
     if #flat == 0 then
         if query ~= "" then
-            list.empty:SetText("Nichts gefunden für \"" .. query .. "\".")
+            list.empty:SetText(string.format(L["Nothing found for \"%s\"."], query))
         elseif view == "help" then
-            list.empty:SetText("Gerade kannst du mit keinem deiner Charaktere\njemandem ein Upgrade craften.\n\nÖffne deine Berufsfenster, damit die\nRezepte erfasst werden.")
+            list.empty:SetText(L["None of your characters can craft\nanyone an upgrade right now.\n\nOpen your profession windows so your\nrecipes get recorded."])
         elseif view == "mine" then
-            list.empty:SetText("Gerade kann dir niemand ein Upgrade craften.\n\nSynce mit der Gilde, damit du ihre\nRezepte siehst.")
+            list.empty:SetText(L["Nobody can craft you an upgrade right now.\n\nSync with your guild to see\ntheir recipes."])
         else
-            list.empty:SetText("Noch keine Upgrades gefunden.\n\nÖffne bei deinen Handwerkern einmal\ndas Berufsfenster und synce mit der Gilde.")
+            list.empty:SetText(L["No upgrades found yet.\n\nOpen the profession window once on each\nof your crafters and sync with your guild."])
         end
     end
 
@@ -382,8 +383,8 @@ function Rebuild()
     end
 
     local st = ns.stats or { targets = 0, crafters = 0 }
-    status.left:SetText(string.format("%d Upgrades  ·  %d Charaktere  ·  %d Handwerker%s",
-        counts.all, st.targets, st.crafters, ns.pending and "  ·  |cfff2852elade Itemdaten …|r" or ""))
+    status.left:SetText(string.format(L["%d upgrades  ·  %d characters  ·  %d crafters%s"],
+        counts.all, st.targets, st.crafters, ns.pending and "  ·  |cfff2852e" .. L["loading item data …"] .. "|r" or ""))
 
     RenderList()
     RenderDetail()
@@ -413,7 +414,7 @@ function RenderList()
                 r.exp:SetTexture(it.closed and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
                 r.title:SetText(CharName(it.key))
                 local rec = Rec(it.key)
-                r.sub:SetText((rec and rec.level and ("Stufe " .. rec.level) or "") .. "  " .. Tag(it.key))
+                r.sub:SetText((rec and rec.level and (L["Level "] .. rec.level) or "") .. "  " .. Tag(it.key))
                 r.count:SetText(it.n)
                 r.sel:Hide()
                 r.bar:Hide()
@@ -421,7 +422,7 @@ function RenderList()
                 local e = it.e
                 local d = ns.ItemData(e.itemID)
                 r.icon:SetTexture(d and d.icon or EMPTY_ICON)
-                r.name:SetText(d and d.name or "Lade …")
+                r.name:SetText(d and d.name or L["Loading …"])
                 r.name:SetTextColor(QualityColor(d and d.quality))
                 if groupBy == "crafter" then
                     r.meta:SetText(CharName(e.target))
@@ -490,7 +491,7 @@ local function CreateHeader()
     title:SetText("Friendsmith")
     local sub = Text(h, 10, C.muted)
     sub:SetPoint("BOTTOMLEFT", logo, "BOTTOMRIGHT", 10, 0)
-    sub:SetText("Gilden-Handwerk & Upgrades")
+    sub:SetText(L["Guild crafting & upgrades"])
 
     local close = CreateFrame("Button", nil, h)
     close:SetSize(28, 28)
@@ -518,7 +519,7 @@ local function CreateHeader()
     mag:SetVertexColor(0.7, 0.7, 0.75)
     local ph = Text(sb, 11, C.muted)
     ph:SetPoint("LEFT", 26, 0)
-    ph:SetText("Suchen: Gegenstand, Name, Platz …")
+    ph:SetText(L["Search: item, name, slot …"])
     sb:SetScript("OnTextChanged", function(self)
         local txt = self:GetText() or ""
         ph:SetShown(txt == "")
@@ -541,9 +542,9 @@ end
 -- Seitenleiste
 ---------------------------------------------------------------------------
 local NAV = {
-    { view = "mine", label = "Für mich",         icon = "Interface\\Icons\\INV_Chest_Chain_05" },
-    { view = "help", label = "Ich kann craften", icon = "Interface\\Icons\\Trade_BlackSmithing" },
-    { view = "all",  label = "Ganze Gilde",      icon = "Interface\\Icons\\INV_Misc_Book_09" },
+    { view = "mine", label = L["For me"],         icon = "Interface\\Icons\\INV_Chest_Chain_05" },
+    { view = "help", label = L["I can craft"], icon = "Interface\\Icons\\Trade_BlackSmithing" },
+    { view = "all",  label = L["Whole guild"],      icon = "Interface\\Icons\\INV_Misc_Book_09" },
 }
 
 local function CreateSidebar()
@@ -557,7 +558,7 @@ local function CreateSidebar()
     edge:SetWidth(1)
     edge:SetColorTexture(C.border[1], C.border[2], C.border[3], 1)
 
-    local lbl = SectionLabel(sidebar, "ANSICHT")
+    local lbl = SectionLabel(sidebar, L["VIEW"])
     lbl:SetPoint("TOPLEFT", 14, -14)
 
     sidebar.nav = {}
@@ -587,42 +588,42 @@ local function CreateSidebar()
         b:SetScript("OnClick", function(self) SetView(self.view) end)
         sidebar.nav[i] = b
     end
-    AddTooltip(sidebar.nav[1], "Für mich", "Wer kann dir oder deinen Twinks etwas Besseres craften?")
-    AddTooltip(sidebar.nav[2], "Ich kann craften", "Für wen kannst du mit deinen Berufen etwas Besseres craften – deine Twinks und die Gilde.")
-    AddTooltip(sidebar.nav[3], "Ganze Gilde", "Alles, was irgendwer in der Gilde irgendwem craften kann.")
+    AddTooltip(sidebar.nav[1], L["For me"], L["Who can craft something better for you or your alts?"])
+    AddTooltip(sidebar.nav[2], L["I can craft"], L["Who you can craft something better for with your professions – your alts and your guild."])
+    AddTooltip(sidebar.nav[3], L["Whole guild"], L["Everything anyone in the guild can craft for anyone."])
 
-    local flbl = SectionLabel(sidebar, "FILTER")
+    local flbl = SectionLabel(sidebar, L["FILTER"])
     flbl:SetPoint("TOPLEFT", 14, -142)
 
     sidebar.toggles = {}
-    local t1 = MakeToggle(sidebar, "Nur meine Handwerker",
+    local t1 = MakeToggle(sidebar, L["Only my crafters"],
         function() return ns.S.onlyMine end,
         function(v) ns.S.onlyMine = v; ns.MarkDirty() end)
     t1:SetPoint("TOPLEFT", 14, -158)
     t1:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t1, "Nur meine Handwerker", "Zeigt nur Upgrades, die du mit deinen eigenen Charakteren craften kannst.")
-    local t2 = MakeToggle(sidebar, "Niedrigere Rüstung",
+    AddTooltip(t1, L["Only my crafters"], L["Only shows upgrades you can craft with your own characters."])
+    local t2 = MakeToggle(sidebar, L["Lower armor types"],
         function() return ns.S.anyArmor end,
         function(v) ns.S.anyArmor = v; ns.MarkDirty() end)
     t2:SetPoint("TOPLEFT", 14, -206)
     t2:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t2, "Niedrigere Rüstungsklassen", "Schlägt z. B. einem Krieger auch Leder vor, nicht nur die beste Rüstungsklasse.")
-    local t3 = MakeToggle(sidebar, "Leiste am Berufsfenster",
+    AddTooltip(t2, L["Lower armor classes"], L["E.g. also suggests leather to a warrior, not just the best armor type."])
+    local t3 = MakeToggle(sidebar, L["Profession window panel"],
         function() return not ns.S.hideProfPanel end,
         function(v) ns.S.hideProfPanel = (not v) or nil; if ns.RefreshProfPanel then ns.RefreshProfPanel() end end)
     t3:SetPoint("TOPLEFT", 14, -262)
     t3:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t3, "Leiste am Berufsfenster", "Zeigt neben dem Berufsfenster, was du mit diesem Beruf für wen craften kannst.")
-    local t4 = MakeToggle(sidebar, "Nach Spec-Werten",
+    AddTooltip(t3, L["Profession window panel"], L["Shows next to the profession window what you can craft with this profession, and for whom."])
+    local t4 = MakeToggle(sidebar, L["Rate by spec stats"],
         function() return ns.S.useStats end,
         function(v) ns.S.useStats = v; ns.MarkDirty() end)
     t4:SetPoint("TOPLEFT", 14, -182)
     t4:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t4, "Nach Spec-Werten bewerten",
-        "Vergleicht Stärke, Beweglichkeit, Zaubermacht usw. gewichtet nach der Spezialisierung " ..
-        "(Talentbaum mit den meisten Punkten). Ohne Talentpunkte oder ausgeschaltet zählt nur das Itemlevel. " ..
-        "Pro Charakter änderbar in den Details.")
-    local t5 = MakeToggle(sidebar, "Minimap-Button",
+    AddTooltip(t4, L["Rating by spec stats"],
+        L["Compares strength, agility, spell power etc., weighted by specialization "] ..
+        L["(the talent tree with the most points). Without talent points, or when turned off, only item level counts. "] ..
+        L["Can be changed per character in the details."])
+    local t5 = MakeToggle(sidebar, L["Minimap button"],
         function() return not (ns.S.minimap and ns.S.minimap.hide) end,
         function(v) ns.SetMinimapShown(v) end)
     t5:SetPoint("TOPLEFT", 14, -286)
@@ -631,7 +632,7 @@ local function CreateSidebar()
 
     local dl = Text(sidebar, 11, C.text)
     dl:SetPoint("TOPLEFT", 14, -236)
-    dl:SetText("Mind. besser")
+    dl:SetText(L["Min. better"])
     local plus = MakeButton(sidebar, 20, 20, "+")
     plus:SetPoint("TOPRIGHT", -10, -232)
     sidebar.diffValue = Text(sidebar, 11, C.green, "CENTER")
@@ -641,16 +642,16 @@ local function CreateSidebar()
     minus:SetPoint("RIGHT", sidebar.diffValue, "LEFT", -2, 0)
     plus:SetScript("OnClick", function() ns.S.minDiff = math.min(30, ns.S.minDiff + 1); ns.MarkDirty(); Rebuild() end)
     minus:SetScript("OnClick", function() ns.S.minDiff = math.max(1, ns.S.minDiff - 1); ns.MarkDirty(); Rebuild() end)
-    AddTooltip(plus, "Mindest-Verbesserung", "Erst ab so vielen Itemleveln mehr (bzw. Prozent bei Spec-Bewertung) gilt etwas als Upgrade.")
+    AddTooltip(plus, L["Minimum improvement"], L["Only counts as an upgrade from this many item levels (or percent with spec rating) better."])
 
-    local sync = MakeButton(sidebar, SIDEBAR_W - 20, 28, "Gilde syncen", true)
+    local sync = MakeButton(sidebar, SIDEBAR_W - 20, 28, L["Sync guild"], true)
     sync:SetPoint("BOTTOMLEFT", 10, 12)
     sync:SetScript("OnClick", function()
         ns.Hello()
-        ns.Print("Daten an die Gilde gesendet und angefragt.")
+        ns.Print(L["Sent your data to the guild and requested theirs."])
     end)
-    AddTooltip(sync, "Gilde syncen", "Sendet deine Daten an alle mit Friendsmith und fragt ihre an.")
-    local rescan = MakeButton(sidebar, SIDEBAR_W - 20, 24, "Ausrüstung neu einlesen")
+    AddTooltip(sync, L["Sync guild"], L["Sends your data to everyone using Friendsmith and requests theirs."])
+    local rescan = MakeButton(sidebar, SIDEBAR_W - 20, 24, L["Rescan gear"])
     rescan:SetPoint("BOTTOMLEFT", sync, "TOPLEFT", 0, 6)
     rescan:SetScript("OnClick", function()
         ns.UpdateSelf()
@@ -665,19 +666,19 @@ local function ShowEntryTooltip(owner, e)
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
     GameTooltip:SetHyperlink("item:" .. e.itemID)
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Für: " .. CharName(e.target), 1, 1, 1)
+    GameTooltip:AddLine(L["For: "] .. CharName(e.target), 1, 1, 1)
     local cd = e.cur and ns.ItemData(e.cur)
     if cd then
-        GameTooltip:AddLine("Trägt aktuell: " .. cd.link .. " (iLvl " .. cd.ilvl .. ")", 1, 1, 1)
+        GameTooltip:AddLine(L["Wearing: "] .. cd.link .. " (iLvl " .. cd.ilvl .. ")", 1, 1, 1)
     else
-        GameTooltip:AddLine("Platz ist leer", 1, 1, 1)
+        GameTooltip:AddLine(L["Slot is empty"], 1, 1, 1)
     end
-    GameTooltip:AddLine("Verbesserung: " .. GainText(e) .. "  (" .. ns.SpecLabel(e.target) .. ")", 0.36, 0.86, 0.42)
+    GameTooltip:AddLine(L["Improvement: "] .. GainText(e) .. "  (" .. ns.SpecLabel(e.target) .. ")", 0.36, 0.86, 0.42)
     local tr = Rec(e.target)
     local diffs = ns.StatDiffText(ns.ItemStats(e.itemID), e.cur and ns.ItemStats(e.cur, tr and tr.suffix and tr.suffix[e.slot]), ns.WeightsFor(e.target))
     if diffs ~= "" then GameTooltip:AddLine(diffs, 1, 1, 1, true) end
-    GameTooltip:AddLine("Herstellbar von: " .. CrafterNames(e.crafters), 1, 1, 1, true)
-    GameTooltip:AddLine("Klick: Details · Shift-Klick: verlinken · Strg-Klick: anprobieren", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Craftable by: "] .. CrafterNames(e.crafters), 1, 1, 1, true)
+    GameTooltip:AddLine(L["Click: details · Shift-click: link · Ctrl-click: try on"], 0.6, 0.6, 0.6)
     GameTooltip:Show()
 end
 
@@ -695,10 +696,10 @@ local function CreateList()
     edge:SetColorTexture(C.border[1], C.border[2], C.border[3], 1)
 
     -- Gruppieren
-    local gl = SectionLabel(list, "GRUPPIEREN")
+    local gl = SectionLabel(list, L["GROUP BY"])
     gl:SetPoint("TOPLEFT", 12, -16)
     list.seg = {}
-    local modes = { { "target", "Empfänger" }, { "crafter", "Handwerker" } }
+    local modes = { { "target", L["Recipient"] }, { "crafter", L["Crafter"] } }
     for i, m in ipairs(modes) do
         local b = MakeButton(list, 90, 22, m[2])
         b.mode = m[1]
@@ -847,16 +848,16 @@ local function CreateOverview(parent)
 
     local t = Text(ov, 16, C.text)
     t:SetPoint("TOPLEFT", 18, -16)
-    t:SetText("Übersicht")
+    t:SetText(L["Overview"])
     ov.who = Text(ov, 11, C.muted)
     ov.who:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -4)
 
     local cw = (W - 2 - SIDEBAR_W - LIST_W - 36 - 10) / 2
     ov.cards = {
-        StatCard(ov, "FÜR MICH", "Interface\\Icons\\INV_Chest_Chain_05"),
-        StatCard(ov, "ICH KANN CRAFTEN", "Interface\\Icons\\Trade_BlackSmithing"),
-        StatCard(ov, "HANDWERKER", "Interface\\Icons\\INV_Misc_Note_01"),
-        StatCard(ov, "GILDE GESAMT", "Interface\\Icons\\INV_Misc_Gear_01"),
+        StatCard(ov, L["FOR ME"], "Interface\\Icons\\INV_Chest_Chain_05"),
+        StatCard(ov, L["I CAN CRAFT"], "Interface\\Icons\\Trade_BlackSmithing"),
+        StatCard(ov, L["CRAFTERS"], "Interface\\Icons\\INV_Misc_Note_01"),
+        StatCard(ov, L["WHOLE GUILD"], "Interface\\Icons\\INV_Misc_Gear_01"),
     }
     for i, c in ipairs(ov.cards) do
         c:SetWidth(cw)
@@ -864,7 +865,7 @@ local function CreateOverview(parent)
         c:SetPoint("TOPLEFT", 18 + col * (cw + 10), -62 - row * 64)
     end
 
-    local nl = SectionLabel(ov, "NÄCHSTE SCHRITTE")
+    local nl = SectionLabel(ov, L["NEXT STEPS"])
     nl:SetPoint("TOPLEFT", 18, -200)
 
     ov.hints = {}
@@ -920,26 +921,26 @@ local function RenderOverview()
     end
     if best then
         local d = ns.ItemData(best.itemID)
-        add("Bestes Upgrade: " .. (d and d.name or "…"),
-            string.format("%s · %s · von %s", SLOT_NAMES[best.slot] or "?", GainText(best), CrafterNames(best.crafters)),
+        add(L["Best upgrade: "] .. (d and d.name or "…"),
+            string.format(L["%s · %s · by %s"], SLOT_NAMES[best.slot] or "?", GainText(best), CrafterNames(best.crafters)),
             function() Select(best) end)
     end
     if counts.help > 0 then
-        add("Du kannst " .. counts.help .. " Upgrades craften", "Für deine Twinks und die Gilde – hier klicken für die Liste.",
+        add(string.format(L["You can craft %d upgrades"], counts.help), L["For your alts and your guild – click here for the list."],
             function() SetView("help") end)
     end
     if not IsInGuild() then
-        add("Keine Gilde", "Ohne Gilde werden nur deine eigenen Charaktere verglichen.")
+        add(L["No guild"], L["Without a guild, only your own characters are compared."])
     elseif foreign == 0 then
-        add("Mit der Gilde syncen", "Noch keine Daten aus der Gilde. Hier klicken zum Austauschen.",
-            function() ns.Hello(); ns.Print("Daten an die Gilde gesendet und angefragt.") end)
+        add(L["Sync with your guild"], L["No data from your guild yet. Click here to sync."],
+            function() ns.Hello(); ns.Print(L["Sent your data to the guild and requested theirs."]) end)
     end
     if myRecipes == 0 then
-        add("Rezepte erfassen", "Öffne einmal jedes Berufsfenster dieses Charakters (Filter aus).")
+        add(L["Record recipes"], L["Open each profession window of this character once (filters off)."])
     else
-        add(myRecipes .. " Ausrüstungs-Rezepte erfasst", "Neue Rezepte gelernt? Einfach das Berufsfenster öffnen.")
+        add(string.format(L["%d gear recipes recorded"], myRecipes), L["Learned new recipes? Just open the profession window."])
     end
-    if ns.pending then add("Lade Itemdaten …", "Einige Gegenstände sind noch nicht im Cache, gleich vollständig.") end
+    if ns.pending then add(L["Loading item data …"], L["Some items aren't cached yet, almost done."]) end
 
     for i, b in ipairs(ov.hints) do
         local h = hints[i]
@@ -964,7 +965,7 @@ local function CreateItemView(parent)
     back:SetPoint("TOPRIGHT", -14, -12)
     local bt = Text(back, 10, C.muted, "RIGHT")
     bt:SetPoint("RIGHT")
-    bt:SetText("< Übersicht")
+    bt:SetText(L["< Overview"])
     back:SetScript("OnEnter", function() bt:SetTextColor(1, 1, 1) end)
     back:SetScript("OnLeave", function() bt:SetTextColor(C.muted[1], C.muted[2], C.muted[3]) end)
     back:SetScript("OnClick", function() Select(nil) end)
@@ -997,7 +998,7 @@ local function CreateItemView(parent)
     it.meta:SetPoint("RIGHT", -18, 0)
 
     -- Vergleich
-    local vl = SectionLabel(it, "VERGLEICH")
+    local vl = SectionLabel(it, L["COMPARISON"])
     vl:SetPoint("TOPLEFT", 18, -96)
     local box = Panel(it, C.panel2)
     box:SetPoint("TOPLEFT", 18, -110)
@@ -1005,7 +1006,7 @@ local function CreateItemView(parent)
     box:SetHeight(70)
     local cl = Text(box, 9, C.muted)
     cl:SetPoint("TOPLEFT", 10, -8)
-    cl:SetText("TRÄGT AKTUELL")
+    cl:SetText(L["CURRENTLY WEARING"])
     it.curIcon = Icon(box, 20)
     it.curIcon:SetPoint("TOPLEFT", 10, -22)
     it.gain = Text(box, 20, C.green, "RIGHT")
@@ -1020,7 +1021,7 @@ local function CreateItemView(parent)
     it.statLine:SetPoint("RIGHT", box, "RIGHT", -10, 0)
 
     -- Fuer
-    local fl = SectionLabel(it, "FÜR")
+    local fl = SectionLabel(it, L["FOR"])
     fl:SetPoint("TOPLEFT", 18, -194)
     it.forName = Text(it, 13)
     it.forName:SetPoint("TOPLEFT", 18, -208)
@@ -1028,18 +1029,18 @@ local function CreateItemView(parent)
     it.forSub:SetPoint("LEFT", it.forName, "RIGHT", 8, 0)
     it.spec = Text(it, 10, C.muted)
     it.spec:SetPoint("TOPLEFT", it.forName, "BOTTOMLEFT", 0, -5)
-    it.specBtn = MakeButton(it, 64, 18, "ändern")
+    it.specBtn = MakeButton(it, 64, 18, L["change"])
     it.specBtn.label:SetFont(FONT, 10, "")
     it.specBtn:SetPoint("TOPRIGHT", -18, -206)
     it.specBtn:SetScript("OnClick", function()
         if selEntry then ns.CycleSpec(selEntry.target) end
     end)
-    AddTooltip(it.specBtn, "Bewertung ändern",
-        "Schaltet für diesen Charakter durch: Automatisch → Talentbaum 1 → 2 → 3 → nur Itemlevel. " ..
-        "Gilt nur bei dir.")
+    AddTooltip(it.specBtn, L["Change rating"],
+        L["Cycles for this character: automatic → talent tree 1 → 2 → 3 → item level only. "] ..
+        L["Only affects you."])
 
     -- Handwerker
-    local hl = SectionLabel(it, "HERSTELLBAR VON")
+    local hl = SectionLabel(it, L["CRAFTABLE BY"])
     hl:SetPoint("TOPLEFT", 18, -250)
     it.crafters = {}
     for i = 1, MAX_CRAFTER_ROWS do
@@ -1052,16 +1053,16 @@ local function CreateItemView(parent)
         r.name:SetPoint("LEFT", 10, 0)
         r.sub = Text(r, 10, C.muted)
         r.sub:SetPoint("LEFT", r.name, "RIGHT", 8, 0)
-        r.btn = MakeButton(r, 70, 18, "Flüstern")
+        r.btn = MakeButton(r, 70, 18, L["Whisper"])
         r.btn:SetPoint("RIGHT", -4, 0)
         r.btn.label:SetFont(FONT, 10, "")
         r.btn:SetScript("OnClick", function(self)
             local e = selEntry
             if not e or not self.key then return end
             local d = ns.ItemData(e.itemID)
-            local link = d and d.link or "das Teil"
-            local forWhom = (e.target == ns.PlayerKey()) and "mir" or ("meinem Twink " .. ns.ShortName(e.target))
-            Whisper(self.key, "Hallo! Könntest du " .. forWhom .. " " .. link .. " herstellen? Mats bringe ich mit.")
+            local link = d and d.link or L["the item"]
+            local forWhom = (e.target == ns.PlayerKey()) and L["me"] or string.format(L["my alt %s"], ns.ShortName(e.target))
+            Whisper(self.key, ns.Subst(L["Hi! Could you craft {item} for {who}? I\'ll bring the mats."], { item = link, who = forWhom }))
         end)
         it.crafters[i] = r
     end
@@ -1069,10 +1070,10 @@ local function CreateItemView(parent)
     it.more:SetPoint("TOPLEFT", 18, -264 - MAX_CRAFTER_ROWS * 28)
 
     -- Aktionen
-    it.link = MakeButton(it, 150, 26, "Im Chat verlinken")
+    it.link = MakeButton(it, 150, 26, L["Link in chat"])
     it.link:SetPoint("BOTTOMLEFT", 18, 14)
     it.link:SetScript("OnClick", function() if selEntry then LinkInChat(selEntry.itemID) end end)
-    it.ask = MakeButton(it, 150, 26, "Anfrage flüstern", true)
+    it.ask = MakeButton(it, 150, 26, L["Whisper request"], true)
     it.ask:SetPoint("BOTTOMRIGHT", -18, 14)
     it.ask:SetScript("OnClick", function(self) if self.run then self.run() end end)
 end
@@ -1082,13 +1083,13 @@ local function RenderItem(e)
     local qr, qg, qb = QualityColor(d and d.quality)
     it.icon:SetTexture(d and d.icon or EMPTY_ICON)
     SetBorderColor(it.iconBorder, qr, qg, qb, 1)
-    it.name:SetText(d and d.name or "Lade Itemdaten …")
+    it.name:SetText(d and d.name or L["Loading item data …"])
     it.name:SetTextColor(qr, qg, qb)
     local meta = { SLOT_NAMES[e.slot] or "?" }
     if d then
-        if d.subName and d.subName ~= "" and d.subName ~= "Verschiedenes" then meta[#meta + 1] = d.subName end
+        if d.subName and d.subName ~= "" and d.subName ~= "Verschiedenes" and d.subName ~= "Miscellaneous" then meta[#meta + 1] = d.subName end
         meta[#meta + 1] = "iLvl " .. d.ilvl
-        if d.req and d.req > 1 then meta[#meta + 1] = "ab Stufe " .. d.req end
+        if d.req and d.req > 1 then meta[#meta + 1] = L["requires level "] .. d.req end
     end
     it.meta:SetText(table.concat(meta, "  ·  "))
 
@@ -1099,26 +1100,26 @@ local function RenderItem(e)
         it.curName:SetTextColor(QualityColor(cd and cd.quality))
         if e.mode == "stat" then
             it.gain:SetText(DiffText(e))
-            it.gainLabel:SetText("FÜR DIE SPEC")
+            it.gainLabel:SetText(L["FOR THE SPEC"])
         else
             it.gain:SetText("+" .. e.diff)
-            it.gainLabel:SetText("ITEMLEVEL")
+            it.gainLabel:SetText(L["ITEM LEVEL"])
         end
     else
         it.curIcon:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
-        it.curName:SetText("Platz ist leer")
+        it.curName:SetText(L["Slot is empty"])
         it.curName:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
-        it.gain:SetText("NEU")
-        it.gainLabel:SetText("FREIER PLATZ")
+        it.gain:SetText(L["NEW"])
+        it.gainLabel:SetText(L["EMPTY SLOT"])
     end
 
     it.forName:SetText(CharName(e.target))
     it.forSub:SetText(LevelClass(e.target) .. "   " .. Tag(e.target))
-    it.spec:SetText("Bewertet nach: |cffe6e6eb" .. ns.SpecLabel(e.target) .. "|r")
+    it.spec:SetText(L["Rated by: "] .. "|cffe6e6eb" .. ns.SpecLabel(e.target) .. "|r")
     local w = ns.WeightsFor(e.target)
     local tr = Rec(e.target)
     local diffs = ns.StatDiffText(ns.ItemStats(e.itemID), e.cur and ns.ItemStats(e.cur, tr and tr.suffix and tr.suffix[e.slot]), w)
-    it.statLine:SetText(diffs ~= "" and diffs or "Keine Wertunterschiede bekannt")
+    it.statLine:SetText(diffs ~= "" and diffs or L["No known stat differences"])
 
     for i, r in ipairs(it.crafters) do
         local k = e.crafters[i]
@@ -1134,27 +1135,27 @@ local function RenderItem(e)
         end
     end
     local extra = #e.crafters - MAX_CRAFTER_ROWS
-    it.more:SetText(extra > 0 and ("+" .. extra .. " weitere") or "")
+    it.more:SetText(extra > 0 and string.format(L["+%d more"], extra) or "")
 
     -- Hauptaktion
-    local link = d and d.link or "das Teil"
+    local link = d and d.link or L["the item"]
     local foreignCrafter = FirstForeign(e.crafters)
     if not IsMine(e.target) and AnyMine(e.crafters) then
-        it.ask.label:SetText("Angebot flüstern")
+        it.ask.label:SetText(L["Whisper offer"])
         it.ask.run = function()
-            local diff = e.cur and (" (" .. GainText(e) .. " für dich)") or " (dein Platz ist noch leer)"
-            Whisper(e.target, "Hallo! Ich kann dir " .. link .. " herstellen" .. diff .. ". Interesse? Mats bringst du mit.")
+            local diff = e.cur and ns.Subst(L[" ({gain} for you)"], { gain = GainText(e) }) or L[" (your slot is still empty)"]
+            Whisper(e.target, ns.Subst(L["Hi! I can craft you {item}{gain}. Interested? Just bring the mats."], { item = link, gain = diff }))
         end
         it.ask:SetActive(true)
     elseif foreignCrafter then
-        it.ask.label:SetText("Anfrage flüstern")
+        it.ask.label:SetText(L["Whisper request"])
         it.ask.run = function()
-            local forWhom = (e.target == ns.PlayerKey()) and "mir" or ("meinem Twink " .. ns.ShortName(e.target))
-            Whisper(foreignCrafter, "Hallo! Könntest du " .. forWhom .. " " .. link .. " herstellen? Mats bringe ich mit.")
+            local forWhom = (e.target == ns.PlayerKey()) and L["me"] or string.format(L["my alt %s"], ns.ShortName(e.target))
+            Whisper(foreignCrafter, ns.Subst(L["Hi! Could you craft {item} for {who}? I\'ll bring the mats."], { item = link, who = forWhom }))
         end
         it.ask:SetActive(true)
     else
-        it.ask.label:SetText("Selbst herstellen")
+        it.ask.label:SetText(L["Craft it yourself"])
         it.ask.run = nil
         it.ask:SetActive(false)
     end
@@ -1218,7 +1219,7 @@ local function CreateUI()
     status.left:SetPoint("LEFT", 12, 0)
     local right = Text(status, 10, C.muted, "RIGHT")
     right:SetPoint("RIGHT", -12, 0)
-    right:SetText("v" .. ns.VERSION .. "  ·  /fsmith hilfe")
+    right:SetText("v" .. ns.VERSION .. "  ·  " .. L["/fsmith help"])
 
     f:SetScript("OnShow", function() Rebuild() end)
 end
@@ -1256,7 +1257,7 @@ local function AddTooltipLines(tt, itemID)
         for _, e in ipairs(ups) do
             t[#t + 1] = CharName(e.target) .. " " .. DiffText(e)
         end
-        tt:AddLine("Upgrade für: " .. table.concat(t, ", "), 0.3, 1, 0.3, true)
+        tt:AddLine(L["Upgrade for: "] .. table.concat(t, ", "), 0.3, 1, 0.3, true)
     end
     tt:Show()
 end
@@ -1285,37 +1286,37 @@ SlashCmdList.FRIENDSMITH = function(msg)
     msg = ((msg or ""):lower():match("^%s*(.-)%s*$")) or ""
     if msg == "sync" then
         ns.Hello()
-        ns.Print("Daten an die Gilde gesendet und angefragt.")
+        ns.Print(L["Sent your data to the guild and requested theirs."])
     elseif msg == "scan" then
         ns.UpdateSelf()
         ns.ScanRecipes(true)
     elseif msg:match("^diff") then
         local n = tonumber(msg:match("%d+"))
         if n then ns.S.minDiff = math.max(1, n); ns.MarkDirty() end
-        ns.Print("Mindest-Verbesserung: " .. ns.S.minDiff .. " Itemlevel.")
-    elseif msg == "ruestung" or msg == "rüstung" then
+        ns.Print(string.format(L["Minimum improvement: %d (item levels, or percent with spec rating)."], ns.S.minDiff))
+    elseif msg == "armor" or msg == "ruestung" or msg == "rüstung" then
         ns.S.anyArmor = not ns.S.anyArmor
         ns.MarkDirty()
-        ns.Print(ns.S.anyArmor and "Auch niedrigere Rüstungsklassen werden vorgeschlagen."
-            or "Nur die beste Rüstungsklasse jeder Klasse wird vorgeschlagen.")
+        ns.Print(ns.S.anyArmor and L["Lower armor types will be suggested too."]
+            or L["Only each class's best armor type will be suggested."])
     elseif msg == "minimap" then
         local show = ns.S.minimap and ns.S.minimap.hide
         ns.SetMinimapShown(show and true or false)
-        ns.Print(show and "Minimap-Button eingeblendet." or "Minimap-Button ausgeblendet.")
+        ns.Print(show and L["Minimap button shown."] or L["Minimap button hidden."])
     elseif msg == "reset" then
         for k, rec in pairs(FriendsmithDB.chars) do
             if not rec.mine then FriendsmithDB.chars[k] = nil end
         end
         ns.MarkDirty()
-        ns.Print("Gespeicherte Gildendaten gelöscht (deine eigenen Charaktere bleiben).")
+        ns.Print(L["Stored guild data deleted (your own characters are kept)."])
     elseif msg == "help" or msg == "hilfe" then
-        ns.Print("/fsmith – Fenster öffnen/schließen")
-        ns.Print("/fsmith sync – Daten mit der Gilde austauschen")
-        ns.Print("/fsmith scan – Berufsfenster neu einlesen (Fenster muss offen sein)")
-        ns.Print("/fsmith diff 3 – erst ab +3 Itemlevel als Upgrade zählen")
-        ns.Print("/fsmith ruestung – auch niedrigere Rüstungsklassen erlauben (an/aus)")
-        ns.Print("/fsmith minimap – Minimap-Button ein/aus")
-        ns.Print("/fsmith reset – Daten anderer Gildenmitglieder löschen")
+        ns.Print(L["/fsmith – open/close the window"])
+        ns.Print(L["/fsmith sync – exchange data with your guild"])
+        ns.Print(L["/fsmith scan – rescan the profession window (must be open)"])
+        ns.Print(L["/fsmith diff 3 – only count +3 or more as an upgrade"])
+        ns.Print(L["/fsmith armor – allow lower armor types (on/off)"])
+        ns.Print(L["/fsmith minimap – minimap button on/off"])
+        ns.Print(L["/fsmith reset – delete other guild members' data"])
     else
         ns.ToggleUI()
     end

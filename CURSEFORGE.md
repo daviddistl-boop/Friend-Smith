@@ -28,7 +28,7 @@ Friendsmith looks at the gear everyone is wearing and the recipes everyone knows
 ### Commands
 `/fsmith` window · `/fsmith sync` sync with guild · `/fsmith scan` re-read open profession · `/fsmith diff 3` minimum improvement · `/fsmith minimap` toggle minimap button · `/fsmith help`
 
-*The interface is currently in German. English translation is planned.*
+*Languages: English and German (follows your game client).*
 
 ---
 

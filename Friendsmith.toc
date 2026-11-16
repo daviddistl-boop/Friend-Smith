@@ -3,7 +3,7 @@
 ## Notes: Shows who in your guild (and among your alts) can craft gear upgrades for whom.
 ## Notes-deDE: Zeigt, wer in deiner Gilde (und unter deinen Twinks) wem ein Ausrüstungs-Upgrade craften kann.
 ## Author: Dave
-## Version: 0.3.0
+## Version: 0.4.0
 ## Category: Professions
 ## Category-deDE: Berufe
 ## SavedVariables: FriendsmithDB
@@ -16,6 +16,7 @@
 embeds.xml
 #@end-no-lib-strip@
 
+Locales.lua
 Core.lua
 Stats.lua
 Comm.lua

@@ -2,6 +2,7 @@
 -- Solange ein Charakter keine Talentpunkte verteilt hat, wird nach Itemlevel bewertet.
 
 local ADDON, ns = ...
+local L = ns.L
 
 local GetItemStatsFn = (C_Item and C_Item.GetItemStats) or GetItemStats
 
@@ -28,9 +29,9 @@ local STAT_KEYS = {
 }
 ns.STAT_ORDER = { "STR", "AGI", "STA", "INT", "SPI", "AP", "RAP", "SP", "HEAL", "MP5", "HIT", "CRIT", "DEF", "DPS", "ARMOR" }
 ns.STAT_NAMES = {
-    STR = "Stärke", AGI = "Beweglichkeit", STA = "Ausdauer", INT = "Intelligenz", SPI = "Willenskraft",
-    ARMOR = "Rüstung", DPS = "Schaden/Sek.", AP = "Angriffskraft", RAP = "Distanz-AK", SP = "Zaubermacht",
-    HEAL = "Heilung", MP5 = "Mana alle 5 Sek.", DEF = "Verteidigung", HIT = "Trefferchance", CRIT = "Kritisch",
+    STR = L["Strength"], AGI = L["Agility"], STA = L["Stamina"], INT = L["Intellect"], SPI = L["Spirit"],
+    ARMOR = L["Armor"], DPS = L["Damage/sec"], AP = L["Attack Power"], RAP = L["Ranged AP"], SP = L["Spell Power"],
+    HEAL = L["Healing"], MP5 = L["Mana per 5 sec"], DEF = L["Defense"], HIT = L["Hit"], CRIT = L["Crit"],
 }
 
 -- Werte, die zeigen "fuer wen ist dieses Teil gemacht". Hat ein Teil solche Werte,
@@ -56,15 +57,15 @@ local P = {
 
 -- Reihenfolge der Talentbaeume wie im Classic-Talentfenster
 local SPECS = {
-    WARRIOR = { { "Waffen", P.melee }, { "Furor", P.melee }, { "Schutz", P.tank } },
-    PALADIN = { { "Heilig", P.healer }, { "Schutz", P.ptank }, { "Vergeltung", P.melee } },
-    HUNTER  = { { "Tierherrschaft", P.hunter }, { "Treffsicherheit", P.hunter }, { "Überleben", P.hunter } },
-    ROGUE   = { { "Meucheln", P.rogue }, { "Kampf", P.rogue }, { "Täuschung", P.rogue } },
-    PRIEST  = { { "Disziplin", P.healer }, { "Heilig", P.healer }, { "Schatten", P.caster } },
-    SHAMAN  = { { "Elementar", P.caster }, { "Verstärkung", P.enh }, { "Wiederherstellung", P.healer } },
-    MAGE    = { { "Arkan", P.caster }, { "Feuer", P.caster }, { "Frost", P.caster } },
-    WARLOCK = { { "Gebrechen", P.lock }, { "Dämonologie", P.lock }, { "Zerstörung", P.lock } },
-    DRUID   = { { "Gleichgewicht", P.caster }, { "Wilder Kampf", P.feral }, { "Wiederherstellung", P.healer } },
+    WARRIOR = { { L["Arms"], P.melee }, { L["Fury"], P.melee }, { L["Protection"], P.tank } },
+    PALADIN = { { L["Holy"], P.healer }, { L["Protection"], P.ptank }, { L["Retribution"], P.melee } },
+    HUNTER  = { { L["Beast Mastery"], P.hunter }, { L["Marksmanship"], P.hunter }, { L["Survival"], P.hunter } },
+    ROGUE   = { { L["Assassination"], P.rogue }, { L["Combat"], P.rogue }, { L["Subtlety"], P.rogue } },
+    PRIEST  = { { L["Discipline"], P.healer }, { L["Holy"], P.healer }, { L["Shadow"], P.caster } },
+    SHAMAN  = { { L["Elemental"], P.caster }, { L["Enhancement"], P.enh }, { L["Restoration"], P.healer } },
+    MAGE    = { { L["Arcane"], P.caster }, { L["Fire"], P.caster }, { "Frost", P.caster } },
+    WARLOCK = { { L["Affliction"], P.lock }, { L["Demonology"], P.lock }, { L["Destruction"], P.lock } },
+    DRUID   = { { L["Balance"], P.caster }, { L["Feral Combat"], P.feral }, { L["Restoration"], P.healer } },
 }
 
 ---------------------------------------------------------------------------
@@ -112,10 +113,10 @@ function ns.SpecLabel(key)
     local rec = FriendsmithDB.chars[key]
     local name = i and rec and SPECS[rec.class] and SPECS[rec.class][i] and SPECS[rec.class][i][1]
     local o = Override(key)
-    if name then return name .. (o and " (manuell)" or "") end
-    if o == 0 then return "Itemlevel (manuell)" end
-    if not ns.S.useStats then return "Itemlevel" end
-    return "Itemlevel (keine Talente)"
+    if name then return name .. (o and L[" (manual)"] or "") end
+    if o == 0 then return L["Item level (manual)"] end
+    if not ns.S.useStats then return L["Item level"] end
+    return L["Item level (no talents)"]
 end
 
 -- Automatisch -> Baum 1 -> 2 -> 3 -> Itemlevel -> Automatisch

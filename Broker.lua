@@ -4,6 +4,7 @@
 -- 3. Addon-Menue (Addon Compartment) ueber die Eintraege in der .toc
 
 local ADDON, ns = ...
+local L = ns.L
 
 ns.LOGO = "Interface\\AddOns\\Friendsmith\\Media\\logo"
 
@@ -32,12 +33,12 @@ end
 local function FillTooltip(tt)
     local mine, help = ns.Counts()
     tt:AddLine("Friendsmith", 0.95, 0.52, 0.18)
-    tt:AddDoubleLine("Für mich", mine, 1, 1, 1, 0.36, 0.86, 0.42)
-    tt:AddDoubleLine("Ich kann craften", help, 1, 1, 1, 0.36, 0.86, 0.42)
+    tt:AddDoubleLine(L["For me"], mine, 1, 1, 1, 0.36, 0.86, 0.42)
+    tt:AddDoubleLine(L["I can craft"], help, 1, 1, 1, 0.36, 0.86, 0.42)
     tt:AddLine(" ")
-    tt:AddLine("Linksklick: Fenster öffnen/schließen", 0.6, 0.6, 0.6)
-    tt:AddLine("Rechtsklick: \"Ich kann craften\"", 0.6, 0.6, 0.6)
-    if ownButton then tt:AddLine("Ziehen: am Minimap-Rand verschieben", 0.6, 0.6, 0.6) end
+    tt:AddLine(L["Left-click: open/close the window"], 0.6, 0.6, 0.6)
+    tt:AddLine(L["Right-click: \"I can craft\""], 0.6, 0.6, 0.6)
+    if ownButton then tt:AddLine(L["Drag: move around the minimap"], 0.6, 0.6, 0.6) end
 end
 
 local function OnClick(button)
@@ -51,7 +52,7 @@ end
 function ns.RefreshBroker()
     if not ldbObject then return end
     local mine, help = ns.Counts()
-    ldbObject.text = string.format("|cff5cdb6b%d|r für mich · |cff5cdb6b%d|r craftbar", mine, help)
+    ldbObject.text = string.format(L["|cff5cdb6b%d|r for me · |cff5cdb6b%d|r craftable"], mine, help)
 end
 
 ---------------------------------------------------------------------------

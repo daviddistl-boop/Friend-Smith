@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+- Oberfläche auf Englisch. Deutsche Spiel-Clients sehen weiterhin alles auf Deutsch.
+- Neuer Befehl `/fsmith armor` (das alte `/fsmith ruestung` geht weiter).
+
 ## 0.3.0
 - Neuer Name: **Friendsmith** (vorher Zunftschmiede). Befehle jetzt `/fsmith` bzw. `/friendsmith`.
 - Bewertung nach Spezialisierung: Sobald Talentpunkte verteilt sind, werden die Werte des Gegenstands

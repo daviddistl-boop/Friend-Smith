@@ -2,6 +2,7 @@
 -- Speichert Ausruestung und Rezepte und berechnet, wer wem ein Upgrade craften kann.
 
 local ADDON, ns = ...
+local L = ns.L
 -- Version kommt aus der .toc, damit sie nur an einer Stelle gepflegt wird
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 ns.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or "?"
@@ -451,7 +452,7 @@ function ns.ScanRecipes(verbose)
     if verbose or added > 0 then
         local total = 0
         for _ in pairs(rec.recipes) do total = total + 1 end
-        ns.Print(string.format("%d neue Ausruestungs-Rezepte erfasst (gesamt %d).", added, total))
+        ns.Print(string.format(L["%d new gear recipes recorded (total %d)."], added, total))
     end
 end
 

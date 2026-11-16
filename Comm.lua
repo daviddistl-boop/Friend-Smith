@@ -1,6 +1,7 @@
 -- Friendsmith – Gilden-Synchronisation ueber unsichtbare Addon-Nachrichten
 
 local ADDON, ns = ...
+local L = ns.L
 
 local PREFIX = "FSMITH1"
 local PROTO  = "1"

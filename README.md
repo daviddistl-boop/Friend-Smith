@@ -2,6 +2,8 @@
 
 Zeigt, wer in deiner Gilde – und unter deinen eigenen Twinks – wem ein Ausrüstungs-Upgrade craften kann.
 Gedacht für Craftlocked-Gilden, funktioniert aber für jede Gilde.
+Sprachen: Englisch und Deutsch – das Addon richtet sich nach der Sprache des Spiel-Clients.
+Neue Sprachen kommen als Block in `Locales.lua` dazu.
 
 ## Was es macht
 - Speichert von jedem deiner Charaktere die angelegte Ausrüstung und alle gelernten Rezepte für Ausrüstung.
