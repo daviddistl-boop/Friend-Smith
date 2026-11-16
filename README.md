@@ -1,79 +1,88 @@
-# Friendsmith (WoW Forever)
+# Friendsmith
 
-Zeigt, wer in deiner Gilde – und unter deinen eigenen Twinks – wem ein Ausrüstungs-Upgrade craften kann.
-Gedacht für Craftlocked-Gilden, funktioniert aber für jede Gilde.
-Sprachen: Englisch und Deutsch – das Addon richtet sich nach der Sprache des Spiel-Clients.
-Neue Sprachen kommen als Block in `Locales.lua` dazu.
+**Who in my guild can craft me something better – and who can I help?**
 
-## Was es macht
-- Speichert von jedem deiner Charaktere die angelegte Ausrüstung und alle gelernten Rezepte für Ausrüstung.
-- Tauscht diese Daten unsichtbar über den Gildenkanal mit allen aus, die das Addon ebenfalls haben.
-- Rechnet aus, welche craftbaren Teile für welchen Charakter besser sind als das, was er gerade trägt.
-- Zeigt das in einem Fenster (`/fsmith`) mit drei Ansichten:
-  - **Für mich** – wer kann dir oder deinen Twinks etwas Besseres craften?
-  - **Ich kann craften** – für wen kannst du mit deinen Berufen etwas Besseres craften (Twinks und Gilde)?
-  - **Ganze Gilde** – alles auf einen Blick.
-  Die Liste ist wie im Berufsfenster nach Charakter (oder Handwerker) gruppiert und einklappbar.
-  Rechts stehen Details, ein Vergleich mit dem getragenen Teil und Knöpfe zum Anfragen/Anbieten per Flüstern.
-- Hängt eine **Leiste ans Berufsfenster**: „Upgrades für dich“, „Upgrades für <Twink>“, „Upgrades für <Gildenmitglied>“
-  aus dem gerade offenen Beruf. Klick öffnet das Rezept, Rechtsklick zeigt es im Friendsmith-Fenster.
-  Die Leiste lässt sich am Kopf verschieben und in der Seitenleiste des Fensters abschalten.
-- Im Tooltip jedes Gegenstands: „craftbar von …“ und „Upgrade für …“.
-- **Addon-Button** mit eigenem Logo: als Broker-Eintrag in Leisten wie Titan Panel, ChocolateBar oder Bazooka
-  (zeigt „X für mich · Y craftbar“), als Minimap-Button (über LibDBIcon, sonst ein eigener, am Rand verschiebbar)
-  und im Addon-Menü an der Minimap. Linksklick öffnet das Fenster, Rechtsklick zeigt „Ich kann craften“.
+Friendsmith shows who in your guild – and among your own alts – can craft a gear upgrade for whom.
+Made for craft-locked guilds on WoW Forever, but it works for any guild.
+
+Languages: English and German (follows your game client).
+
+## Features
+- Remembers the equipped gear and all learned gear recipes of every one of your characters.
+- Shares this data invisibly through the guild addon channel with everyone who also runs Friendsmith.
+- Works out which craftable items are better than what each character is currently wearing.
+- Shows the results in a window (`/fsmith`) with three views:
+  - **For me** – who can craft something better for you or your alts?
+  - **I can craft** – who can you craft something better for with your professions (your alts and your guild)?
+  - **Whole guild** – everything at a glance.
+
+  The list is grouped by character (or by crafter) and collapsible, just like the profession window.
+  The detail pane compares the item with what the character is wearing and has buttons to whisper a request or an offer – the item link is already filled in.
+- **Upgrades next to your profession window:** "Upgrades for you", "Upgrades for &lt;alt&gt;" and "Upgrades for &lt;guildmate&gt;" from the profession you have open.
+  Click to open the recipe, right-click to show it in the Friendsmith window.
+  Drag the panel by its header, or turn it off in the window's sidebar.
+- **Item tooltips** show "craftable by …" and "upgrade for …".
+- **Addon button** with its own logo:
+  - Broker launcher for bars like Titan Panel, ChocolateBar or Bazooka (shows "X for me · Y craftable")
+  - Minimap button (uses LibDBIcon if available, otherwise its own button you can drag around the minimap)
+  - Entry in the addon compartment menu
+
+  Left-click opens the window, right-click opens "I can craft".
 
 ## Installation
-1. Den Ordner `Friendsmith` (mit den `.lua`- und `.toc`-Dateien darin) nach
-   `...\World of Warcraft\<Forever-Ordner>\Interface\AddOns\` kopieren.
-   Den richtigen Spielordner findest du im Battle.net-Launcher bei WoW Forever über
-   das Zahnrad → „Im Explorer anzeigen“.
-2. Im Charakterauswahl-Bildschirm unter „AddOns“ prüfen, dass Friendsmith aktiviert ist.
-   Falls es als „veraltet“ markiert ist: „Veraltete AddOns laden“ anhaken.
-3. Nach dem Kopieren das Spiel ganz neu starten (nicht nur `/reload`).
+**CurseForge app:** search for *Friendsmith* and install it.
 
-## Einrichtung
-1. Mit **jedem** Charakter einmal einloggen (Ausrüstung wird automatisch gespeichert).
-2. Bei jedem Handwerker einmal **jedes Berufsfenster öffnen**. Am besten alle Kategorien
-   aufklappen und Filter (z. B. „nur herstellbare“) ausschalten, damit alle Rezepte erfasst werden.
-3. Alle in der Gilde installieren das Addon. Beim Einloggen tauschen sich alle automatisch aus,
-   manuell geht es mit dem Knopf „Gilde syncen“ oder `/fsmith sync`.
+**Manually:**
+1. Copy the `Friendsmith` folder into `...\World of Warcraft\<your Forever folder>\Interface\AddOns\`.
+   You can find the right game folder in the Battle.net launcher: WoW Forever → gear icon → *Show in Explorer*.
+2. On the character select screen, open *AddOns* and make sure Friendsmith is enabled.
+   If it's marked as *out of date*, tick *Load out of date AddOns*.
+3. Restart the game completely (a `/reload` is not enough for a newly added addon).
 
-## Befehle
-| Befehl | Wirkung |
+## Getting started
+1. Log in once on **every** character – their gear is saved automatically.
+2. On each crafter, open **every profession window** once. Expand all categories and turn off
+   filters like "Have Materials" so all recipes get recorded.
+3. Ask your guild to install Friendsmith. Everyone syncs automatically on login;
+   you can also click *Sync guild* or type `/fsmith sync`.
+
+## Commands
+| Command | What it does |
 |---|---|
-| `/fsmith` | Fenster öffnen/schließen |
-| `/fsmith sync` | Daten mit der Gilde austauschen |
-| `/fsmith scan` | offenes Berufsfenster neu einlesen |
-| `/fsmith diff 3` | erst ab +3 Itemlevel bzw. +3 % (Spec-Bewertung) als Upgrade zählen (Standard: 1) |
-| `/fsmith ruestung` | auch niedrigere Rüstungsklassen vorschlagen (an/aus) |
-| `/fsmith minimap` | Minimap-Button ein/aus |
-| `/fsmith reset` | Daten anderer Gildenmitglieder löschen |
-| `/fsmith hilfe` | Befehlsübersicht |
+| `/fsmith` | Open/close the window |
+| `/fsmith sync` | Exchange data with your guild |
+| `/fsmith scan` | Rescan the open profession window |
+| `/fsmith diff 3` | Only count +3 item levels (or +3 % with spec rating) as an upgrade (default: 1) |
+| `/fsmith armor` | Also suggest lower armor types (on/off) |
+| `/fsmith minimap` | Show/hide the minimap button |
+| `/fsmith reset` | Delete stored data of other guild members |
+| `/fsmith help` | List all commands |
 
-Im Fenster: Klick zeigt Details, Shift-Klick verlinkt im Chat, Strg-Klick probiert an, Mausrad scrollt, Suche oben rechts.
+`/friendsmith` works as well.
 
-## Wie „Upgrade“ bewertet wird (Grenzen)
-- **Nach Spezialisierung:** Sobald ein Charakter Talentpunkte verteilt hat, zählt der Talentbaum mit den
-  meisten Punkten. Die Werte (Stärke, Beweglichkeit, Zaubermacht, Waffen-DPS, Rüstung …) werden je nach Spec
-  gewichtet und mit dem getragenen Teil verglichen – inklusive Zufallswerten wie „… des Affen“.
-  Angezeigt wird, um wie viel Prozent das neue Teil besser ist.
-- Zauber-Ausrüstung für Krieger und Schurken bzw. Nahkampf-Ausrüstung für Zauberer wird dabei weggelassen.
-- Ohne Talentpunkte (oder mit ausgeschaltetem „Nach Spec-Werten“) zählt nur das **Itemlevel**.
-- Pro Charakter lässt sich die Bewertung im Detailbereich über „ändern“ festlegen
-  (Automatisch → Talentbaum 1/2/3 → nur Itemlevel). Das gilt nur bei dir.
-- Die Gewichtungen sind grobe Leveling-Werte. Rückmeldungen sind willkommen.
-- Rüstung: Standardmäßig nur die beste Rüstungsklasse (Stoff/Leder/Kette/Platte) nach
-  Classic-Regeln. Krieger und Paladine bekommen ab Level 40 Platte, Jäger und Schamanen ab 40 Kette.
-- Waffen: nach den Classic-Waffenfähigkeiten der Klasse (Schurken zusätzlich 1H-Äxte, wie in Forever).
-- Teile, die erst bis zu 2 Level über dem aktuellen Level tragbar sind, werden mit angezeigt.
-- Pro Charakter und Platz werden höchstens die 3 besten Vorschläge gezeigt – plus bis zu 3, die du selbst craften kannst.
-- Beim Aufheben gebundene Teile (BoP) werden nur dem Handwerker selbst vorgeschlagen, weil man sie nicht weitergeben kann.
-- Nur Charaktere derselben Gilde (plus deine eigenen Charaktere) werden berücksichtigt.
-  Daten, die älter als 30 Tage sind, werden ignoriert.
+In the window: click for details, Shift-click to link in chat, Ctrl-click to try on, mouse wheel to scroll, search box at the top right.
 
-## Hinweise
-- Das Addon wurde außerhalb des Spiels gegen eine nachgebaute Schnittstelle getestet, aber noch
-  nicht live in WoW Forever. Forever schränkt Addons stellenweise ein. Falls ein Lua-Fehler
-  auftaucht: mit `/console scriptErrors 1` Fehler anzeigen lassen und die Meldung kopieren.
-- Im Kampf sendet und rechnet das Addon nichts.
+## How upgrades are rated
+- **By spec:** Once a character has spent talent points, the talent tree with the most points is used.
+  Item stats (Strength, Agility, Spell Power, weapon DPS, Armor …) are weighted for that spec and compared
+  with the equipped item – including random suffixes like "… of the Monkey".
+  The window shows how many percent better the new item is.
+- Caster gear for warriors and rogues, and melee gear for casters, is left out.
+- Without talent points (or with *Rate by spec stats* turned off), only **item level** counts.
+- You can override the rating per character in the detail pane via *change*
+  (automatic → talent tree 1/2/3 → item level only). This only affects you.
+- The stat weights are rough leveling values – feedback is very welcome.
+- **Armor:** by default only the best armor type for the class (cloth/leather/mail/plate) following Classic rules.
+  Warriors and paladins get plate from level 40, hunters and shamans get mail from level 40.
+- **Weapons:** based on each class's Classic weapon skills (rogues can also use one-handed axes, as in Forever).
+- Items you can wear within the next 2 levels are shown too.
+- Per character and slot, at most the 3 best suggestions are shown – plus up to 3 that you can craft yourself.
+- Bind-on-pickup items are only suggested to the crafter themselves, since they can't be traded.
+- Only characters in your guild (plus your own characters) are included.
+  Data older than 30 days is ignored.
+
+## Notes
+- This is an early version. WoW Forever restricts some addon features.
+  If you run into a Lua error, turn on error messages with `/console scriptErrors 1` and include the error text in your report.
+- Friendsmith doesn't send or calculate anything during combat.
+- Want to add a language? Add a block to `Locales.lua`.
