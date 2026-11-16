@@ -1,0 +1,24 @@
+## Interface: 16001
+## Title: Friendsmith
+## Notes: Shows who in your guild (and among your alts) can craft gear upgrades for whom.
+## Notes-deDE: Zeigt, wer in deiner Gilde (und unter deinen Twinks) wem ein Ausrüstungs-Upgrade craften kann.
+## Author: Dave
+## Version: 0.3.0
+## Category: Professions
+## Category-deDE: Berufe
+## SavedVariables: FriendsmithDB
+## IconTexture: Interface\AddOns\Friendsmith\Media\logo
+## AddonCompartmentFunc: Friendsmith_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: Friendsmith_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: Friendsmith_OnAddonCompartmentLeave
+
+#@no-lib-strip@
+embeds.xml
+#@end-no-lib-strip@
+
+Core.lua
+Stats.lua
+Comm.lua
+UI.lua
+Broker.lua
+Profession.lua

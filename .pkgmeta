@@ -1,0 +1,19 @@
+package-as: Friendsmith
+
+# Bibliotheken holt der CurseForge-Packager beim Release automatisch.
+externals:
+  Libs/LibStub: https://repos.curseforge.com/wow/libstub/trunk
+  Libs/CallbackHandler-1.0: https://repos.curseforge.com/wow/callbackhandler/trunk/CallbackHandler-1.0
+  Libs/LibDataBroker-1.1: https://github.com/tekkub/libdatabroker-1-1.git
+  Libs/LibDBIcon-1.0: https://repos.curseforge.com/wow/libdbicon-1-0/trunk/LibDBIcon-1.0
+
+ignore:
+  - assets
+  - tools
+  - Media/logo128.tga
+  - CURSEFORGE.md
+  - RELEASE.md
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
