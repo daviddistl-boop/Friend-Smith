@@ -5,7 +5,7 @@
 local ADDON, ns = ...
 local L = ns.L
 
-local P_W, P_H, ROW_H = 260, 420, 20
+local P_W, P_H, ROW_H = 260, 420, 18
 local panel
 local rows, flat = {}, {}
 local offset, numRows = 0, 0
@@ -104,7 +104,6 @@ local function Render()
         else
             r:Show()
             local hdr = it.kind == "h"
-            r.hbg:SetShown(hdr)
             r.exp:SetShown(hdr)
             r.count:SetShown(hdr)
             r.icon:SetShown(not hdr)
@@ -112,17 +111,19 @@ local function Render()
             if hdr then
                 r.exp:SetTexture(it.closed and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
                 local who = (it.key == ns.PlayerKey()) and L["you"] or st.CharName(it.key)
+                r.text:SetFontObject(GameFontNormal)
                 r.text:SetText(L["Upgrades for "] .. who)
-                r.text:SetTextColor(st.C.gold[1], st.C.gold[2], st.C.gold[3])
-                r.text:SetPoint("LEFT", 22, 0)
+                r.text:SetTextColor(1, 0.82, 0)
+                r.text:SetPoint("LEFT", 20, 0)
                 r.count:SetText(it.n)
             else
                 local e = it.e
                 local d = ns.ItemData(e.itemID)
                 r.icon:SetTexture(d and d.icon or st.EMPTY_ICON)
+                r.text:SetFontObject(GameFontHighlightSmall)
                 r.text:SetText(d and d.name or L["Loading …"])
                 r.text:SetTextColor(st.QualityColor(d and d.quality))
-                r.text:SetPoint("LEFT", 42, 0)
+                r.text:SetPoint("LEFT", 40, 0)
                 r.gain:SetText(st.DiffText(e))
             end
         end
@@ -139,7 +140,7 @@ function ns.RefreshProfPanel()
     local total, linked = Build()
     local maxOff = math.max(0, #flat - numRows)
     offset = math.min(offset, maxOff)
-    panel.count:SetText(total > 0 and total or "")
+    panel.count:SetText(total > 0 and string.format(L["%d upgrades"], total) or "")
     if linked then
         panel.empty:SetText(L["Someone else's profession – only your own recipes are evaluated here."])
     else
@@ -151,42 +152,66 @@ function ns.RefreshProfPanel()
 end
 
 ---------------------------------------------------------------------------
--- Aufbau
+-- Aufbau im Stil des Berufsfensters (Blizzard-Dialograhmen, goldene Ueberschriften)
 ---------------------------------------------------------------------------
 local function Place(host)
     panel:ClearAllPoints()
-    local x, y = ns.S.profPanelX or 2, ns.S.profPanelY or -12
+    local x, y = ns.S.profPanelX or 0, ns.S.profPanelY or -14
     panel:SetPoint("TOPLEFT", host, "TOPRIGHT", x, y)
 end
 
+local function BText(parent, fontObject, justify)
+    local fs = parent:CreateFontString(nil, "OVERLAY", fontObject)
+    fs:SetJustifyH(justify or "LEFT")
+    if fs.SetWordWrap then fs:SetWordWrap(false) end
+    return fs
+end
+
+local BACKDROP_TEMPLATE = BackdropTemplateMixin and "BackdropTemplate" or nil
+
 local function Create(host)
     local st = S()
-    local C = st.C
-    panel = CreateFrame("Frame", "FriendsmithProfPanel", host)
+    panel = CreateFrame("Frame", "FriendsmithProfPanel", host, BACKDROP_TEMPLATE)
     panel:SetSize(P_W, P_H)
     panel:SetFrameStrata(host:GetFrameStrata())
     panel:SetFrameLevel(host:GetFrameLevel() + 5)
     panel:EnableMouse(true)
     panel:SetMovable(true)
     panel:SetClampedToScreen(true)
-    st.Fill(panel, C.bg)
-    st.Border(panel, { 0, 0, 0, 1 })
+    if panel.SetBackdrop then
+        panel:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            tile = true, tileSize = 32, edgeSize = 26,
+            insets = { left = 8, right = 8, top = 8, bottom = 8 },
+        })
+        panel:SetBackdropBorderColor(1, 0.86, 0.45)
+    else
+        st.Fill(panel, { 0.06, 0.05, 0.04, 0.95 })
+    end
 
-    -- Kopf (zum Verschieben ziehen)
-    local head = CreateFrame("Frame", nil, panel)
-    head:SetPoint("TOPLEFT", 1, -1)
-    head:SetPoint("TOPRIGHT", -1, -1)
-    head:SetHeight(34)
-    st.Fill(head, C.header)
-    local line = head:CreateTexture(nil, "BORDER")
-    line:SetPoint("BOTTOMLEFT")
-    line:SetPoint("BOTTOMRIGHT")
-    line:SetHeight(1)
-    line:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.55)
-    head:EnableMouse(true)
-    head:RegisterForDrag("LeftButton")
-    head:SetScript("OnDragStart", function() panel:StartMoving() end)
-    head:SetScript("OnDragStop", function()
+    -- Titelband wie bei Blizzard-Dialogen
+    local ribbon = panel:CreateTexture(nil, "ARTWORK")
+    ribbon:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+    ribbon:SetSize(230, 56)
+    ribbon:SetPoint("TOP", 0, 13)
+    local title = BText(panel, "GameFontNormal", "CENTER")
+    title:SetPoint("TOP", ribbon, "TOP", 7, -13)
+    title:SetText("Friendsmith")
+    local logo = panel:CreateTexture(nil, "OVERLAY")
+    logo:SetSize(16, 16)
+    logo:SetPoint("RIGHT", title, "LEFT", -4, 0)
+    logo:SetTexture(ns.LOGO)
+
+    -- oben zum Verschieben ziehen
+    local drag = CreateFrame("Frame", nil, panel)
+    drag:SetPoint("TOPLEFT", 0, 0)
+    drag:SetPoint("TOPRIGHT", 0, 0)
+    drag:SetHeight(30)
+    drag:EnableMouse(true)
+    drag:RegisterForDrag("LeftButton")
+    drag:SetScript("OnDragStart", function() panel:StartMoving() end)
+    drag:SetScript("OnDragStop", function()
         panel:StopMovingOrSizing()
         local h = panel:GetParent()
         local s = panel:GetEffectiveScale() / h:GetEffectiveScale()
@@ -195,55 +220,49 @@ local function Create(host)
         Place(h)
     end)
 
-    local logo = st.Icon(head, 20)
-    logo:SetPoint("LEFT", 8, 0)
-    logo:SetTexture(ns.LOGO)
-    logo:SetTexCoord(0, 1, 0, 1)
-    local title = st.Text(head, 12)
-    title:SetPoint("LEFT", logo, "RIGHT", 7, 0)
-    title:SetText("Friendsmith")
-    panel.count = st.Text(head, 11, C.green)
-    panel.count:SetPoint("LEFT", title, "RIGHT", 6, 0)
+    -- dunkler Listenbereich mit duennem Rahmen (wie die Rezeptliste)
+    local inset = CreateFrame("Frame", nil, panel, BACKDROP_TEMPLATE)
+    inset:SetPoint("TOPLEFT", 12, -26)
+    inset:SetPoint("BOTTOMRIGHT", -12, 38)
+    if inset.SetBackdrop then
+        inset:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = false, edgeSize = 12,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 },
+        })
+        inset:SetBackdropColor(0, 0, 0, 0.45)
+        inset:SetBackdropBorderColor(0.6, 0.5, 0.3, 0.9)
+    end
 
-    local open = st.MakeButton(head, 56, 20, L["Window"])
-    open:SetPoint("RIGHT", -6, 0)
-    open.label:SetFont(st.FONT, 10, "")
-    open:SetScript("OnClick", function() ns.OpenUI("mine") end)
-    open:HookScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["Open Friendsmith"], 1, 1, 1)
-        GameTooltip:AddLine(L["It also shows who can craft something for you."], nil, nil, nil, true)
-        GameTooltip:Show()
-    end)
-    open:HookScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Zeilen
-    local area = CreateFrame("Frame", nil, panel)
-    area:SetPoint("TOPLEFT", 4, -40)
-    area:SetPoint("BOTTOMRIGHT", -4, 24)
-    numRows = math.floor((P_H - 40 - 24) / ROW_H)
+    local area = CreateFrame("Frame", nil, inset)
+    area:SetPoint("TOPLEFT", 5, -5)
+    area:SetPoint("BOTTOMRIGHT", -5, 5)
+    numRows = math.floor((P_H - 26 - 38 - 10) / ROW_H)
     for i = 1, numRows do
         local r = CreateFrame("Button", nil, area)
         r:SetHeight(ROW_H)
         r:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
         r:SetPoint("RIGHT")
         r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-        r.hbg = st.Fill(r, C.panel2)
         local hl = r:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight2")
+        hl:SetBlendMode("ADD")
+        hl:SetVertexColor(1, 0.82, 0, 0.45)
         hl:SetAllPoints()
-        hl:SetColorTexture(1, 1, 1, 0.07)
         r.exp = r:CreateTexture(nil, "ARTWORK")
         r.exp:SetSize(14, 14)
-        r.exp:SetPoint("LEFT", 4, 0)
+        r.exp:SetPoint("LEFT", 2, 0)
         r.icon = st.Icon(r, 16)
         r.icon:SetPoint("LEFT", 20, 0)
-        r.count = st.Text(r, 10, C.muted, "RIGHT")
-        r.count:SetPoint("RIGHT", -6, 0)
-        r.gain = st.Text(r, 11, C.green, "RIGHT")
-        r.gain:SetPoint("RIGHT", -6, 0)
+        r.count = BText(r, "GameFontNormalSmall", "RIGHT")
+        r.count:SetPoint("RIGHT", -4, 0)
+        r.count:SetTextColor(0.75, 0.75, 0.75)
+        r.gain = BText(r, "GameFontGreenSmall", "RIGHT")
+        r.gain:SetPoint("RIGHT", -4, 0)
         r.gain:SetWidth(40)
-        r.text = st.Text(r, 11)
-        r.text:SetPoint("LEFT", 22, 0)
+        r.text = BText(r, "GameFontHighlightSmall")
+        r.text:SetPoint("LEFT", 20, 0)
         r.text:SetPoint("RIGHT", r.gain, "LEFT", -4, 0)
 
         r:SetScript("OnClick", function(self, btn)
@@ -268,6 +287,7 @@ local function Create(host)
             local it = self.item
             if it and it.kind == "i" and ns.ShowEntryTooltip then
                 ns.ShowEntryTooltip(self, it.e)
+                GameTooltip:AddLine(L["Click: open recipe  ·  Shift: link"], 0.6, 0.6, 0.6)
                 GameTooltip:AddLine(L["Right-click: show in the Friendsmith window"], 0.6, 0.6, 0.6)
                 GameTooltip:Show()
             end
@@ -282,14 +302,27 @@ local function Create(host)
         Render()
     end)
 
-    panel.empty = st.Text(panel, 11, C.muted, "CENTER")
-    panel.empty:SetPoint("TOP", 0, -70)
-    panel.empty:SetWidth(P_W - 30)
+    panel.empty = BText(inset, "GameFontDisable", "CENTER")
+    panel.empty:SetPoint("TOP", 0, -40)
+    panel.empty:SetWidth(P_W - 50)
     if panel.empty.SetWordWrap then panel.empty:SetWordWrap(true) end
 
-    local foot = st.Text(panel, 9, C.muted, "CENTER")
-    foot:SetPoint("BOTTOM", 0, 8)
-    foot:SetText(L["Click: open recipe  ·  Shift: link"])
+    -- unten: Anzahl und Knopf zum grossen Fenster
+    panel.count = BText(panel, "GameFontHighlightSmall")
+    panel.count:SetPoint("BOTTOMLEFT", 18, 18)
+
+    local open = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    open:SetSize(96, 22)
+    open:SetPoint("BOTTOMRIGHT", -14, 12)
+    open:SetText(L["Window"])
+    open:SetScript("OnClick", function() ns.OpenUI("mine") end)
+    open:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Open Friendsmith"], 1, 1, 1)
+        GameTooltip:AddLine(L["It also shows who can craft something for you."], nil, nil, nil, true)
+        GameTooltip:Show()
+    end)
+    open:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     Place(host)
 end

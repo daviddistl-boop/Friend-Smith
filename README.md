@@ -2,23 +2,25 @@
 
 **Who in my guild can craft me something better – and who can I help?**
 
-Friendsmith shows who in your guild – and among your own alts – can craft a gear upgrade for whom.
+Friendsmith shows who in your guild, among your friends and your own alts can craft a gear upgrade for whom.
 Made for craft-locked guilds on WoW Forever, but it works for any guild.
 
 Languages: English and German (follows your game client).
 
 ## Features
 - Remembers the equipped gear and all learned gear recipes of every one of your characters.
-- Shares this data invisibly through the guild addon channel with everyone who also runs Friendsmith.
+- Shares this data invisibly with everyone in your guild who also runs Friendsmith.
+- **Friends:** also syncs with people on your friend list who use Friendsmith, even outside your guild.
+  Data is only accepted from people on your own friend list. Turn it off with *Share with friends* in the sidebar.
 - Works out which craftable items are better than what each character is currently wearing.
 - Shows the results in a window (`/fsmith`) with three views:
   - **For me** – who can craft something better for you or your alts?
-  - **I can craft** – who can you craft something better for with your professions (your alts and your guild)?
-  - **Whole guild** – everything at a glance.
+  - **I can craft** – who can you craft something better for with your professions (your alts, guild and friends)?
+  - **Guild & friends** – everything at a glance.
 
   The list is grouped by character (or by crafter) and collapsible, just like the profession window.
   The detail pane compares the item with what the character is wearing and has buttons to whisper a request or an offer – the item link is already filled in.
-- **Upgrades next to your profession window:** "Upgrades for you", "Upgrades for &lt;alt&gt;" and "Upgrades for &lt;guildmate&gt;" from the profession you have open.
+- **Upgrades next to your profession window**, in the same style as the profession window: "Upgrades for you", "Upgrades for &lt;alt&gt;" and "Upgrades for &lt;guildmate&gt;" from the profession you have open.
   Click to open the recipe, right-click to show it in the Friendsmith window.
   Drag the panel by its header, or turn it off in the window's sidebar.
 - **Item tooltips** show "craftable by …" and "upgrade for …".
@@ -43,14 +45,14 @@ Languages: English and German (follows your game client).
 1. Log in once on **every** character – their gear is saved automatically.
 2. On each crafter, open **every profession window** once. Expand all categories and turn off
    filters like "Have Materials" so all recipes get recorded.
-3. Ask your guild to install Friendsmith. Everyone syncs automatically on login;
-   you can also click *Sync guild* or type `/fsmith sync`.
+3. Ask your guild and friends to install Friendsmith. Everyone syncs automatically on login;
+   you can also click *Sync* or type `/fsmith sync`.
 
 ## Commands
 | Command | What it does |
 |---|---|
 | `/fsmith` | Open/close the window |
-| `/fsmith sync` | Exchange data with your guild |
+| `/fsmith sync` | Exchange data with your guild and friends |
 | `/fsmith scan` | Rescan the open profession window |
 | `/fsmith diff 3` | Only count +3 item levels (or +3 % with spec rating) as an upgrade (default: 1) |
 | `/fsmith armor` | Also suggest lower armor types (on/off) |
@@ -78,7 +80,7 @@ In the window: click for details, Shift-click to link in chat, Ctrl-click to try
 - Items you can wear within the next 2 levels are shown too.
 - Per character and slot, at most the 3 best suggestions are shown – plus up to 3 that you can craft yourself.
 - Bind-on-pickup items are only suggested to the crafter themselves, since they can't be traded.
-- Only characters in your guild (plus your own characters) are included.
+- Only characters in your guild, from your friend list (plus your own characters) are included.
   Data older than 30 days is ignored.
 
 ## Notes

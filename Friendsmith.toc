@@ -1,9 +1,9 @@
 ## Interface: 16001
 ## Title: Friendsmith
-## Notes: Shows who in your guild (and among your alts) can craft gear upgrades for whom.
-## Notes-deDE: Zeigt, wer in deiner Gilde (und unter deinen Twinks) wem ein Ausrüstungs-Upgrade craften kann.
+## Notes: Shows who in your guild, among your friends and your alts can craft gear upgrades for whom.
+## Notes-deDE: Zeigt, wer in deiner Gilde, unter deinen Freunden und Twinks wem ein Ausrüstungs-Upgrade craften kann.
 ## Author: Wcked Larry
-## Version: 0.4.0
+## Version: 0.5.0
 ## Category: Professions
 ## Category-deDE: Berufe
 ## SavedVariables: FriendsmithDB

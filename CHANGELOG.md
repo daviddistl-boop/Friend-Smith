@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+- **Friends:** Friendsmith now also syncs with people on your friend list who use it, even if they're not in your guild.
+  Data is exchanged automatically when you or a friend logs in, and only accepted from people on your own friend list.
+  Can be turned off in the sidebar (*Share with friends*). Friends are marked as "Friend" in the window.
+- The panel next to the profession window now matches the look of the profession window
+  (Blizzard dialog frame, gold category headers, standard fonts and buttons).
+- The *Sync* button and `/fsmith sync` now include online friends.
+- The third view is now called *Guild & friends*.
+
 ## 0.4.0
 - The interface is now in English. German game clients still show everything in German.
 - New command `/fsmith armor` (the old `/fsmith ruestung` still works).

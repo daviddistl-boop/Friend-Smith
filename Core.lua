@@ -21,6 +21,7 @@ local DEFAULTS = {
     onlyMine   = false, -- nur eigene Charaktere als Handwerker
     maxAgeDays = 30,    -- Gildendaten aelter als X Tage ignorieren
     anyArmor   = false, -- auch niedrigere Ruestungsklassen vorschlagen
+    shareFriends = true, -- auch mit Freunden (Freundesliste) austauschen, die Friendsmith nutzen
 }
 
 function ns.Print(msg)
@@ -241,7 +242,9 @@ function ns.Compute()
 
     local function relevant(rec)
         if rec.mine then return true end
-        return myGuild ~= nil and rec.guild == myGuild and (now - (rec.updated or 0)) < maxAge
+        if (now - (rec.updated or 0)) >= maxAge then return false end
+        if myGuild ~= nil and rec.guild == myGuild then return true end
+        return rec.friend and ns.S.shareFriends or false
     end
 
     local targets, crafters = {}, {}

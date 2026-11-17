@@ -187,6 +187,10 @@ end
 local function Tag(key)
     if key == ns.PlayerKey() then return "|cfff2852e" .. L["You"] .. "|r" end
     if IsMine(key) then return "|cff7fb2ff" .. L["Alt"] .. "|r" end
+    local r = Rec(key)
+    if r and r.friend and (not r.guild or r.guild ~= GetGuildInfo("player")) then
+        return "|cff66d9a6" .. L["Friend"] .. "|r"
+    end
     return "|cff8f96a8" .. L["Guild"] .. "|r"
 end
 
@@ -544,7 +548,7 @@ end
 local NAV = {
     { view = "mine", label = L["For me"],         icon = "Interface\\Icons\\INV_Chest_Chain_05" },
     { view = "help", label = L["I can craft"], icon = "Interface\\Icons\\Trade_BlackSmithing" },
-    { view = "all",  label = L["Whole guild"],      icon = "Interface\\Icons\\INV_Misc_Book_09" },
+    { view = "all",  label = L["Guild & friends"],      icon = "Interface\\Icons\\INV_Misc_Book_09" },
 }
 
 local function CreateSidebar()
@@ -590,7 +594,7 @@ local function CreateSidebar()
     end
     AddTooltip(sidebar.nav[1], L["For me"], L["Who can craft something better for you or your alts?"])
     AddTooltip(sidebar.nav[2], L["I can craft"], L["Who you can craft something better for with your professions – your alts and your guild."])
-    AddTooltip(sidebar.nav[3], L["Whole guild"], L["Everything anyone in the guild can craft for anyone."])
+    AddTooltip(sidebar.nav[3], L["Guild & friends"], L["Everything anyone in your guild or among your friends can craft for anyone."])
 
     local flbl = SectionLabel(sidebar, L["FILTER"])
     flbl:SetPoint("TOPLEFT", 14, -142)
@@ -628,7 +632,14 @@ local function CreateSidebar()
         function(v) ns.SetMinimapShown(v) end)
     t5:SetPoint("TOPLEFT", 14, -286)
     t5:SetPoint("RIGHT", -10, 0)
-    sidebar.toggles = { t1, t4, t2, t3, t5 }
+    local t6 = MakeToggle(sidebar, L["Share with friends"],
+        function() return ns.S.shareFriends end,
+        function(v) ns.S.shareFriends = v; ns.MarkDirty(); if v then ns.Hello(true) end end)
+    t6:SetPoint("TOPLEFT", 14, -310)
+    t6:SetPoint("RIGHT", -10, 0)
+    AddTooltip(t6, L["Share with friends"],
+        L["Also exchanges data with people on your friend list who use Friendsmith, even if they aren't in your guild. Data is only accepted from people on your own friend list."])
+    sidebar.toggles = { t1, t4, t2, t3, t5, t6 }
 
     local dl = Text(sidebar, 11, C.text)
     dl:SetPoint("TOPLEFT", 14, -236)
@@ -644,13 +655,13 @@ local function CreateSidebar()
     minus:SetScript("OnClick", function() ns.S.minDiff = math.max(1, ns.S.minDiff - 1); ns.MarkDirty(); Rebuild() end)
     AddTooltip(plus, L["Minimum improvement"], L["Only counts as an upgrade from this many item levels (or percent with spec rating) better."])
 
-    local sync = MakeButton(sidebar, SIDEBAR_W - 20, 28, L["Sync guild"], true)
+    local sync = MakeButton(sidebar, SIDEBAR_W - 20, 28, L["Sync"], true)
     sync:SetPoint("BOTTOMLEFT", 10, 12)
     sync:SetScript("OnClick", function()
-        ns.Hello()
-        ns.Print(L["Sent your data to the guild and requested theirs."])
+        ns.Hello(true)
+        ns.Print(L["Sent your data to your guild and friends and requested theirs."])
     end)
-    AddTooltip(sync, L["Sync guild"], L["Sends your data to everyone using Friendsmith and requests theirs."])
+    AddTooltip(sync, L["Sync"], L["Sends your data to your guild and online friends using Friendsmith and requests theirs."])
     local rescan = MakeButton(sidebar, SIDEBAR_W - 20, 24, L["Rescan gear"])
     rescan:SetPoint("BOTTOMLEFT", sync, "TOPLEFT", 0, 6)
     rescan:SetScript("OnClick", function()
@@ -857,7 +868,7 @@ local function CreateOverview(parent)
         StatCard(ov, L["FOR ME"], "Interface\\Icons\\INV_Chest_Chain_05"),
         StatCard(ov, L["I CAN CRAFT"], "Interface\\Icons\\Trade_BlackSmithing"),
         StatCard(ov, L["CRAFTERS"], "Interface\\Icons\\INV_Misc_Note_01"),
-        StatCard(ov, L["WHOLE GUILD"], "Interface\\Icons\\INV_Misc_Gear_01"),
+        StatCard(ov, L["GUILD & FRIENDS"], "Interface\\Icons\\INV_Misc_Gear_01"),
     }
     for i, c in ipairs(ov.cards) do
         c:SetWidth(cw)
@@ -930,10 +941,10 @@ local function RenderOverview()
             function() SetView("help") end)
     end
     if not IsInGuild() then
-        add(L["No guild"], L["Without a guild, only your own characters are compared."])
+        add(L["No guild"], L["Without a guild, only your own characters and friends using Friendsmith are compared."])
     elseif foreign == 0 then
         add(L["Sync with your guild"], L["No data from your guild yet. Click here to sync."],
-            function() ns.Hello(); ns.Print(L["Sent your data to the guild and requested theirs."]) end)
+            function() ns.Hello(true); ns.Print(L["Sent your data to your guild and friends and requested theirs."]) end)
     end
     if myRecipes == 0 then
         add(L["Record recipes"], L["Open each profession window of this character once (filters off)."])
@@ -1285,8 +1296,8 @@ SLASH_FRIENDSMITH2 = "/fsmith"
 SlashCmdList.FRIENDSMITH = function(msg)
     msg = ((msg or ""):lower():match("^%s*(.-)%s*$")) or ""
     if msg == "sync" then
-        ns.Hello()
-        ns.Print(L["Sent your data to the guild and requested theirs."])
+        ns.Hello(true)
+        ns.Print(L["Sent your data to your guild and friends and requested theirs."])
     elseif msg == "scan" then
         ns.UpdateSelf()
         ns.ScanRecipes(true)
@@ -1311,7 +1322,7 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.Print(L["Stored guild data deleted (your own characters are kept)."])
     elseif msg == "help" or msg == "hilfe" then
         ns.Print(L["/fsmith – open/close the window"])
-        ns.Print(L["/fsmith sync – exchange data with your guild"])
+        ns.Print(L["/fsmith sync – exchange data with your guild and friends"])
         ns.Print(L["/fsmith scan – rescan the profession window (must be open)"])
         ns.Print(L["/fsmith diff 3 – only count +3 or more as an upgrade"])
         ns.Print(L["/fsmith armor – allow lower armor types (on/off)"])
