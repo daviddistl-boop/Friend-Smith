@@ -8,6 +8,7 @@ local L = ns.L
 local P_W, P_H, ROW_H = 260, 420, 18
 local panel
 local rows, flat = {}, {}
+local cooking = false -- Kochfenster offen: Buff-Essen statt Upgrades zeigen
 local offset, numRows = 0, 0
 
 local function S() return ns.Style end
@@ -58,10 +59,34 @@ local function GroupOrder(a, b)
     return a < b
 end
 
+-- Kochen: eigenes Buff-Essen nach Kategorie, staerkstes zuerst
+local function BuildFood(map)
+    local total = 0
+    for _, g in ipairs(ns.FoodList()) do
+        local items = {}
+        for _, e in ipairs(g.items) do
+            if map[e.itemID] then items[#items + 1] = e end
+        end
+        if #items > 0 then
+            local ck = "PF:" .. g.cat
+            local closed = ns.S.collapsed[ck]
+            flat[#flat + 1] = { kind = "h", food = true, label = g.label, ck = ck, n = #items, closed = closed }
+            if not closed then
+                for _, e in ipairs(items) do flat[#flat + 1] = { kind = "i", e = e } end
+            end
+            total = total + #items
+        end
+    end
+    return total, false
+end
+
 local function Build()
     wipe(flat)
     local map = ns.CurrentRecipes()
     if not map then return 0, true end
+    ns.S.collapsed = ns.S.collapsed or {}
+    cooking = ns.IsCookingWindow and ns.IsCookingWindow() or false
+    if cooking then return BuildFood(map) end
     local me = ns.PlayerKey()
     local groups, order, total = {}, {}, 0
     for _, e in ipairs(ns.GetResults() or {}) do
@@ -110,9 +135,13 @@ local function Render()
             r.gain:SetShown(not hdr)
             if hdr then
                 r.exp:SetTexture(it.closed and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
-                local who = (it.key == ns.PlayerKey()) and L["you"] or st.CharName(it.key)
                 r.text:SetFontObject(GameFontNormal)
-                r.text:SetText(L["Upgrades for "] .. who)
+                if it.food then
+                    r.text:SetText(it.label)
+                else
+                    local who = (it.key == ns.PlayerKey()) and L["you"] or st.CharName(it.key)
+                    r.text:SetText(L["Upgrades for "] .. who)
+                end
                 r.text:SetTextColor(1, 0.82, 0)
                 r.text:SetPoint("LEFT", 20, 0)
                 r.count:SetText(it.n)
@@ -124,7 +153,12 @@ local function Render()
                 r.text:SetText(d and d.name or L["Loading …"])
                 r.text:SetTextColor(st.QualityColor(d and d.quality))
                 r.text:SetPoint("LEFT", 40, 0)
-                r.gain:SetText(st.DiffText(e))
+                if e.food then
+                    -- gold: niemand kann in dieser Kategorie Besseres kochen
+                    r.gain:SetText((e.rank == 1 and "|cffffd100" or "|cffb0b0b0") .. "+" .. e.amount .. "|r")
+                else
+                    r.gain:SetText(st.DiffText(e))
+                end
             end
         end
     end
@@ -140,9 +174,11 @@ function ns.RefreshProfPanel()
     local total, linked = Build()
     local maxOff = math.max(0, #flat - numRows)
     offset = math.min(offset, maxOff)
-    panel.count:SetText(total > 0 and string.format(L["%d upgrades"], total) or "")
+    panel.count:SetText(total > 0 and string.format(cooking and L["%d buff foods"] or L["%d upgrades"], total) or "")
     if linked then
         panel.empty:SetText(L["Someone else's profession – only your own recipes are evaluated here."])
+    elseif cooking then
+        panel.empty:SetText(L["None of your cooking recipes gives a \"Well Fed\" buff yet.\n\nThe Friendsmith window shows who can cook the best food."])
     else
         panel.empty:SetText(L["With this profession you can't craft anyone an upgrade right now.\n\nThe Friendsmith window shows who can craft something for you."])
     end
@@ -275,7 +311,7 @@ local function Create(host)
             end
             local d = ns.ItemData(it.e.itemID)
             if btn == "RightButton" then
-                ns.OpenUI("help", it.e)
+                ns.OpenUI(it.e.food and "food" or "help", it.e)
             elseif d and IsModifiedClick and HandleModifiedItemClick
                 and (IsModifiedClick("CHATLINK") or IsModifiedClick("DRESSUP")) then
                 HandleModifiedItemClick(d.link)
@@ -315,7 +351,7 @@ local function Create(host)
     open:SetSize(96, 22)
     open:SetPoint("BOTTOMRIGHT", -14, 12)
     open:SetText(L["Window"])
-    open:SetScript("OnClick", function() ns.OpenUI("mine") end)
+    open:SetScript("OnClick", function() ns.OpenUI(cooking and "food" or "mine") end)
     open:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(L["Open Friendsmith"], 1, 1, 1)

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+- The panel next to the profession window now also works for Cooking: it lists your buff food by category,
+  strongest first. Gold means nobody you know can cook anything better in that category.
+
 ## 0.6.0
 - **Buff food:** new view that shows who can cook the best "Well Fed" food in each category
   (Stamina & Spirit, Agility, Strength, Intellect, Mana regeneration …) – across your alts, guild and friends.

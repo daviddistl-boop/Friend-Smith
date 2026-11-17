@@ -16,6 +16,8 @@ local LOCALE = GetLocale and GetLocale() or "enUS"
 if FriendsmithLocaleOverride then LOCALE = FriendsmithLocaleOverride end
 
 if LOCALE == "deDE" then
+    L["%d buff foods"] = "%d Buff-Essen"
+    L["None of your cooking recipes gives a \"Well Fed\" buff yet.\n\nThe Friendsmith window shows who can cook the best food."] = "Keins deiner Kochrezepte gibt bisher einen \"Satt\"-Bonus.\n\nIm Friendsmith-Fenster siehst du, wer das beste Essen kochen kann."
     L["Buff food"] = "Buff-Essen"
     L["Mana regeneration"] = "Manaregeneration"
     L["Who can cook the best \"Well Fed\" food in each category – Stamina, Spirit, Agility and so on."] = "Wer das beste \"Satt\"-Essen jeder Kategorie kochen kann – Ausdauer, Willenskraft, Beweglichkeit usw."
