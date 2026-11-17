@@ -144,7 +144,7 @@ local function SendCharTo(key, what, channel, target)
         for slot, v in pairs(rec.suffix or {}) do sfx[#sfx + 1] = slot .. ":" .. v end
         -- Felder 7 (Spec) und 8 (Zufallseigenschaften) ignorieren aeltere Versionen einfach
         Enqueue(table.concat({ PROTO, "G", key, rec.class or "", tostring(rec.level or 0), table.concat(parts, ","),
-            tostring(rec.spec or 0), table.concat(sfx, ",") }, ";"), channel, target)
+            tostring(rec.spec or 0), table.concat(sfx, ","), rec.wish and "1" or "0" }, ";"), channel, target)
     end
     if what ~= "G" then
         local ids = {}
@@ -280,6 +280,7 @@ function ns.HandlePayload(sender, payload, channel)
             sfx[tonumber(slot)] = tonumber(v)
         end
         rec.suffix = sfx
+        rec.wish = (f[9] == "1") or nil -- "freut sich ueber Hilfe"
     elseif kind == "P" then
         if ns.ParseProfession then ns.ParseProfession(rec, f) end
     elseif kind == "R" then

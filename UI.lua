@@ -185,14 +185,17 @@ local function LevelClass(key)
     return string.format(L["Level %s %s"], r.level or "?", cls)
 end
 
+local WISH_TAG = "|cffff8fc8" .. L["happy about help"] .. "|r"
+
 local function Tag(key)
     if key == ns.PlayerKey() then return "|cfff2852e" .. L["You"] .. "|r" end
     if IsMine(key) then return "|cff7fb2ff" .. L["Alt"] .. "|r" end
     local r = Rec(key)
+    local wish = (r and r.wish) and ("  " .. WISH_TAG) or ""
     if r and r.friend and (not r.guild or r.guild ~= GetGuildInfo("player")) then
-        return "|cff66d9a6" .. L["Friend"] .. "|r"
+        return "|cff66d9a6" .. L["Friend"] .. "|r" .. wish
     end
-    return "|cff8f96a8" .. L["Guild"] .. "|r"
+    return "|cff8f96a8" .. L["Guild"] .. "|r" .. wish
 end
 
 local function QualityColor(q)
@@ -348,6 +351,8 @@ local function GroupOrder(a, b)
     if (a == me) ~= (b == me) then return a == me end
     local ma, mb = IsMine(a), IsMine(b)
     if ma ~= mb then return ma end
+    local wa, wb = ns.Wishes(a), ns.Wishes(b)
+    if wa ~= wb then return wa end
     return a < b
 end
 
@@ -781,19 +786,19 @@ local function CreateSidebar()
     local t2 = MakeToggle(sidebar, L["Lower armor types"],
         function() return ns.S.anyArmor end,
         function(v) ns.S.anyArmor = v; ns.MarkDirty() end)
-    t2:SetPoint("TOPLEFT", 14, -278)
+    t2:SetPoint("TOPLEFT", 14, -274)
     t2:SetPoint("RIGHT", -10, 0)
     AddTooltip(t2, L["Lower armor classes"], L["E.g. also suggests leather to a warrior, not just the best armor type."])
     local t3 = MakeToggle(sidebar, L["Profession window panel"],
         function() return not ns.S.hideProfPanel end,
         function(v) ns.S.hideProfPanel = (not v) or nil; if ns.RefreshProfPanel then ns.RefreshProfPanel() end end)
-    t3:SetPoint("TOPLEFT", 14, -334)
+    t3:SetPoint("TOPLEFT", 14, -324)
     t3:SetPoint("RIGHT", -10, 0)
     AddTooltip(t3, L["Profession window panel"], L["Shows next to the profession window what you can craft with this profession, and for whom."])
     local t4 = MakeToggle(sidebar, L["Rate by spec stats"],
         function() return ns.S.useStats end,
         function(v) ns.S.useStats = v; ns.MarkDirty() end)
-    t4:SetPoint("TOPLEFT", 14, -254)
+    t4:SetPoint("TOPLEFT", 14, -252)
     t4:SetPoint("RIGHT", -10, 0)
     AddTooltip(t4, L["Rating by spec stats"],
         L["Compares strength, agility, spell power etc., weighted by specialization "] ..
@@ -802,22 +807,29 @@ local function CreateSidebar()
     local t5 = MakeToggle(sidebar, L["Minimap button"],
         function() return not (ns.S.minimap and ns.S.minimap.hide) end,
         function(v) ns.SetMinimapShown(v) end)
-    t5:SetPoint("TOPLEFT", 14, -358)
+    t5:SetPoint("TOPLEFT", 14, -346)
     t5:SetPoint("RIGHT", -10, 0)
     local t6 = MakeToggle(sidebar, L["Share with friends"],
         function() return ns.S.shareFriends end,
         function(v) ns.S.shareFriends = v; ns.MarkDirty(); if v then ns.Hello(true) end end)
-    t6:SetPoint("TOPLEFT", 14, -382)
+    t6:SetPoint("TOPLEFT", 14, -368)
     t6:SetPoint("RIGHT", -10, 0)
     AddTooltip(t6, L["Share with friends"],
         L["Also exchanges data with people on your friend list who use Friendsmith, even if they aren't in your guild. Data is only accepted from people on your own friend list."])
-    sidebar.toggles = { t1, t4, t2, t3, t5, t6 }
+    local t7 = MakeToggle(sidebar, L["Happy about help"],
+        function() return ns.S.wishes end,
+        function(v) ns.SetWishes(v); ns.Print(v and L["Silent wishes on: your guild sees where it could help you – you don't have to ask."] or L["Silent wishes off."]) end)
+    t7:SetPoint("TOPLEFT", 14, -390)
+    t7:SetPoint("RIGHT", -10, 0)
+    AddTooltip(t7, L["Happy about help"],
+        L["Friendsmith asks for you: guild members and friends see by themselves what they could craft for you or which mats you need for your profession. Nobody gets a message – they only see it in Friendsmith."])
+    sidebar.toggles = { t1, t4, t2, t3, t5, t6, t7 }
 
     local dl = Text(sidebar, 11, C.text)
-    dl:SetPoint("TOPLEFT", 14, -308)
+    dl:SetPoint("TOPLEFT", 14, -300)
     dl:SetText(L["Min. better"])
     local plus = MakeButton(sidebar, 20, 20, "+")
-    plus:SetPoint("TOPRIGHT", -10, -304)
+    plus:SetPoint("TOPRIGHT", -10, -296)
     sidebar.diffValue = Text(sidebar, 11, C.green, "CENTER")
     sidebar.diffValue:SetWidth(30)
     sidebar.diffValue:SetPoint("RIGHT", plus, "LEFT", -2, 0)
@@ -1324,6 +1336,15 @@ local function RenderOverview()
     if rec and rec.recipes then for _ in pairs(rec.recipes) do myRecipes = myRecipes + 1 end end
     local foreign = 0
     for _, r in pairs(DB.chars) do if not r.mine then foreign = foreign + 1 end end
+
+    -- Stille Wuensche: wem koennte ich helfen?
+    local wishHints = ns.WishHints and ns.WishHints() or {}
+    if #wishHints > 0 then
+        local people = ns.WishPeople(wishHints)
+        local text = ns.WishHintText(wishHints[1]):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
+        add("|cffff8fc8" .. string.format(people == 1 and L["%d guild member would be happy about help"] or L["%d guild members would be happy about help"], people) .. "|r",
+            text, function() ns.Nudge(true) end)
+    end
 
     -- bestes Upgrade fuer den aktuellen Charakter
     local best
@@ -2334,6 +2355,14 @@ SlashCmdList.FRIENDSMITH = function(msg)
         else
             ns.Print(L["/fsmith target [item] 40 – set a stock target (0 removes it)"])
         end
+    elseif msg == "wishes" or msg == "wuensche" or msg == "wünsche" then
+        ns.SetWishes(not ns.S.wishes)
+        ns.Print(ns.S.wishes and L["Silent wishes on: your guild sees where it could help you – you don't have to ask."] or L["Silent wishes off."])
+    elseif msg == "nudges" or msg == "hinweise" then
+        ns.S.nudges = not ns.S.nudges
+        ns.Print(ns.S.nudges and L["Login hints on."] or L["Login hints off."])
+    elseif msg == "help me" or msg == "helfen" then
+        if (ns.Nudge(true) or 0) == 0 then ns.Print(L["Right now nobody needs anything you have."]) end
     elseif msg == "debug" then
         ns.S.debug = not ns.S.debug or nil
         ns.Print(ns.S.debug and L["Debug on: incoming Friendsmith messages are shown in chat."] or L["Debug off."])
@@ -2350,6 +2379,8 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.Print(L["/fsmith diff 3 – only count +3 or more as an upgrade"])
         ns.Print(L["/fsmith armor – allow lower armor types (on/off)"])
         ns.Print(L["/fsmith minimap – minimap button on/off"])
+        ns.Print(L["/fsmith wishes – \"happy about help\" on/off"])
+        ns.Print(L["/fsmith nudges – login hints on/off"])
         ns.Print(L["/fsmith stock – open the guild stock"])
         ns.Print(L["/fsmith target [item] 40 – set a stock target (0 removes it)"])
         ns.Print(L["/fsmith reset – delete other guild members' data"])

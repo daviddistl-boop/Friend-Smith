@@ -56,6 +56,8 @@ local function GroupOrder(a, b)
     if (a == me) ~= (b == me) then return a == me end
     local ma, mb = S().IsMine(a), S().IsMine(b)
     if ma ~= mb then return ma end
+    local wa, wb = ns.Wishes(a), ns.Wishes(b)
+    if wa ~= wb then return wa end
     return a < b
 end
 
@@ -140,7 +142,7 @@ local function Render()
                     r.text:SetText(it.label)
                 else
                     local who = (it.key == ns.PlayerKey()) and L["you"] or st.CharName(it.key)
-                    r.text:SetText(L["Upgrades for "] .. who)
+                    r.text:SetText(L["Upgrades for "] .. who .. (ns.Wishes(it.key) and ("  |cffff8fc8" .. L["happy about help"] .. "|r") or ""))
                 end
                 r.text:SetTextColor(1, 0.82, 0)
                 r.text:SetPoint("LEFT", 20, 0)

@@ -22,6 +22,8 @@ local DEFAULTS = {
     maxAgeDays = 30,    -- Gildendaten aelter als X Tage ignorieren
     anyArmor   = false, -- auch niedrigere Ruestungsklassen vorschlagen
     shareFriends = true, -- auch mit Freunden (Freundesliste) austauschen, die Friendsmith nutzen
+    wishes     = false, -- "Ich freue mich ueber Hilfe": andere sehen von selbst, womit sie helfen koennten
+    nudges     = true,  -- beim Login kurz zeigen, wem ich helfen koennte
 }
 
 function ns.Print(msg)
@@ -373,6 +375,7 @@ function ns.UpdateSelf(levelOverride)
     rec.gear = gear
     rec.suffix = suffix
     if ns.DetectSpec then rec.spec = ns.DetectSpec() end
+    rec.wish = ns.S.wishes or nil
     rec.recipes = rec.recipes or {}
     ns.MarkDirty()
 end

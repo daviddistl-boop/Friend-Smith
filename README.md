@@ -34,6 +34,8 @@ Languages: English and German (follows your game client).
   and prepares a guild chat message – nothing is sent until you press Enter.
 - **Guild bank:** when someone with Friendsmith opens the guild bank, the tabs they can see are shared with the guild.
   It's a snapshot, so the window shows how old it is.
+- **Silent wishes:** tick *Happy about help* and Friendsmith asks for you – your guild sees what it could craft for you
+  or which mats you need, without you having to ask. Helpers get a short hint after login (only in their own chat).
 - **Item tooltips** show "craftable by …" and "upgrade for …".
 - **Addon button** with its own logo:
   - Broker launcher for bars like Titan Panel, ChocolateBar or Bazooka (shows "X for me · Y craftable")
@@ -68,6 +70,8 @@ Languages: English and German (follows your game client).
 | `/fsmith diff 3` | Only count +3 item levels (or +3 % with spec rating) as an upgrade (default: 1) |
 | `/fsmith armor` | Also suggest lower armor types (on/off) |
 | `/fsmith minimap` | Show/hide the minimap button |
+| `/fsmith wishes` | "Happy about help" on/off |
+| `/fsmith nudges` | Login hints about who you could help on/off |
 | `/fsmith stock` | Open the guild stock |
 | `/fsmith target [item] 40` | Set a stock target, officers only (0 removes it) |
 | `/fsmith debug` | Show incoming Friendsmith messages in chat (on/off) |

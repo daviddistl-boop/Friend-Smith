@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.0
+- **Silent wishes:** not everyone likes to ask for help. Tick *Happy about help* in the sidebar and Friendsmith asks for you:
+  guild members and friends see by themselves what they could craft for you and which mats you need for your profession.
+  Nobody gets a message – it only shows up in Friendsmith.
+- Players who are happy about help are marked in the window and in the profession panel, and are listed first.
+- **Gentle hints for helpers:** shortly after login, Friendsmith tells you (only you, in your own chat) who you could help –
+  an upgrade you can craft for someone, or mats in your bags that someone needs. At most 3 lines, the same hint at most once a day.
+  Turn them off with `/fsmith nudges`.
+- The overview shows how many guild members would be happy about help.
+- New commands: `/fsmith wishes` (on/off) and `/fsmith nudges` (login hints on/off).
+
 ## 0.9.1
 - **Profession help with OneForAll:** if you have OneForAll installed, Friendsmith asks its Skill-Up Helper for the
   route to your next big step and shows it in *Profession help* – the steps with their crafts, trainer visits,
