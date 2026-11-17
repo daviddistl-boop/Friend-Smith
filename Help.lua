@@ -1,0 +1,178 @@
+-- Friendsmith – Berufshilfe
+--
+-- Beim Oeffnen des Berufsfensters merkt sich das Addon die Fertigkeit (z. B. 132/150) und welche
+-- bekannten Rezepte gerade orange oder gelb sind. Daraus entsteht ein Vorschlag fuer den naechsten
+-- grossen Schritt (75/150/225/300): "ca. 18x Dunkle Lederstiefel craften – braucht 72x Leichtes Leder …".
+-- Sync: Nachricht "P" (Gilde und Freunde), ausgewertet in Comm.lua.
+
+local ADDON, ns = ...
+local L = ns.L
+
+local STEPS = { 75, 150, 225, 300 }
+local MAX_SKILL = 300
+local MAX_CANDS = 4
+local YELLOW_FACTOR = 2 -- gelbe Rezepte geben nur manchmal einen Punkt: grob doppelt so viele Herstellungen
+
+---------------------------------------------------------------------------
+-- Aus dem offenen Berufsfenster lesen
+---------------------------------------------------------------------------
+local function ProfInfo()
+    local T = C_TradeSkillUI
+    if T and T.GetBaseProfessionInfo then
+        local ok, info = pcall(T.GetBaseProfessionInfo)
+        if ok and type(info) == "table" and info.professionName and info.skillLevel then
+            return info.professionName, info.skillLevel, info.maxSkillLevel
+        end
+    end
+    if T and T.GetTradeSkillLine then
+        local ok, _, name, rank, max = pcall(T.GetTradeSkillLine)
+        if ok and type(name) == "string" and rank then return name, rank, max end
+    end
+    if GetTradeSkillLine then
+        local name, rank, max = GetTradeSkillLine()
+        if name and name ~= "UNKNOWN" and rank then return name, rank, max end
+    end
+end
+
+-- "o" = orange (sicherer Punkt), "y" = gelb (manchmal), sonst nil
+local function Color(info)
+    if info.index and GetTradeSkillInfo then
+        local _, kind = GetTradeSkillInfo(info.index)
+        if kind == "optimal" then return "o" end
+        if kind == "medium" then return "y" end
+        return nil
+    end
+    local T = C_TradeSkillUI
+    if info.recipeID and T and T.GetRecipeInfo then
+        local ok, r = pcall(T.GetRecipeInfo, info.recipeID)
+        if ok and type(r) == "table" then
+            local d = r.relativeDifficulty or r.difficulty
+            if d == 0 or d == "optimal" then return "o" end
+            if d == 1 or d == "medium" then return "y" end
+        end
+    end
+end
+
+local function MatCount(itemID)
+    local n = 0
+    for _, m in ipairs(ns.Reagents(itemID) or {}) do n = n + m[2] end
+    return n
+end
+
+-- Von ScanRecipes aufgerufen
+function ns.RecordProfession(map, rec)
+    local name, rank, max = ProfInfo()
+    if not name or not rank then return false end
+    local cands = {}
+    for itemID, info in pairs(map) do
+        if rec.recipes[itemID] and ns.Reagents(itemID) then
+            local c = Color(info)
+            if c then cands[#cands + 1] = { itemID, c } end
+        end
+    end
+    table.sort(cands, function(a, b)
+        if a[2] ~= b[2] then return a[2] == "o" end
+        local ma, mb = MatCount(a[1]), MatCount(b[1])
+        if ma ~= mb then return ma < mb end
+        return a[1] < b[1]
+    end)
+    for i = #cands, MAX_CANDS + 1, -1 do cands[i] = nil end
+    rec.profs = rec.profs or {}
+    local old = rec.profs[name]
+    local changed = not old or old.rank ~= rank or old.max ~= max or #old.cands ~= #cands
+    if not changed then
+        for i, c in ipairs(cands) do
+            if old.cands[i][1] ~= c[1] or old.cands[i][2] ~= c[2] then changed = true end
+        end
+    end
+    rec.profs[name] = { rank = rank, max = max or MAX_SKILL, t = ns.Now(), cands = cands }
+    return changed
+end
+
+---------------------------------------------------------------------------
+-- Sync: "P;key;Beruf;rang;max;zeit;itemID:o,itemID:y" – je Beruf eine Nachricht
+---------------------------------------------------------------------------
+function ns.ProfessionPayloads(rec)
+    local out = {}
+    for name, p in pairs(rec.profs or {}) do
+        local c = {}
+        for _, x in ipairs(p.cands) do c[#c + 1] = x[1] .. ":" .. x[2] end
+        out[#out + 1] = table.concat({ (name:gsub("[;,:~]", "")), p.rank, p.max, p.t, table.concat(c, ",") }, ";")
+    end
+    return out
+end
+
+function ns.ParseProfession(rec, f)
+    local name, rank, max, t = f[4], tonumber(f[5]), tonumber(f[6]), tonumber(f[7])
+    if not name or name == "" or #name > 40 or not rank or not max or rank < 0 or rank > 1000 or max > 1000 then return end
+    local cands = {}
+    for id, c in (f[8] or ""):gmatch("(%d+):([oy])") do
+        if #cands < MAX_CANDS then cands[#cands + 1] = { tonumber(id), c } end
+    end
+    rec.profs = rec.profs or {}
+    local n = 0
+    for k in pairs(rec.profs) do if k ~= name then n = n + 1 end end
+    if n >= 6 then return end -- mehr Berufe gibt es nicht
+    rec.profs[name] = { rank = rank, max = max, t = t or ns.Now(), cands = cands }
+end
+
+---------------------------------------------------------------------------
+-- Plan
+---------------------------------------------------------------------------
+-- { next, target, points, trainer, options = { { itemID, color, crafts, mats = {{id, n}} } } }
+function ns.ProfPlan(p)
+    local nextStep
+    for _, s in ipairs(STEPS) do
+        if p.rank < s then nextStep = s; break end
+    end
+    if not nextStep then return nil end -- Maximum erreicht
+    local plan = { next = nextStep }
+    if p.max and p.rank >= p.max then
+        plan.trainer = true
+        plan.target = p.max
+        plan.points = 0
+        plan.options = {}
+        return plan
+    end
+    plan.target = math.min(nextStep, p.max or nextStep)
+    plan.points = plan.target - p.rank
+    plan.options = {}
+    for _, c in ipairs(p.cands) do
+        local crafts = plan.points * (c[2] == "y" and YELLOW_FACTOR or 1)
+        local mats
+        local base = ns.Reagents(c[1])
+        if base then
+            mats = {}
+            for i, m in ipairs(base) do mats[i] = { m[1], m[2] * crafts } end
+        end
+        plan.options[#plan.options + 1] = { itemID = c[1], color = c[2], crafts = crafts, mats = mats }
+    end
+    return plan
+end
+
+-- Eintraege fuer die Ansicht: alle Berufe unter 300 von relevanten Charakteren
+function ns.ProfHelpList()
+    local DB = FriendsmithDB
+    local myGuild = GetGuildInfo("player")
+    local now = time()
+    local out = {}
+    for key, rec in pairs(DB.chars) do
+        if rec.profs and ns.IsRelevant(rec, myGuild, now) then
+            for name, p in pairs(rec.profs) do
+                local plan = ns.ProfPlan(p)
+                if plan then
+                    local first = plan.options[1]
+                    out[#out + 1] = {
+                        prof = true, key = key, name = name, p = p, plan = plan,
+                        itemID = first and first.itemID, crafters = { key },
+                    }
+                end
+            end
+        end
+    end
+    table.sort(out, function(a, b)
+        if a.key ~= b.key then return a.key < b.key end
+        return a.name < b.name
+    end)
+    return out
+end

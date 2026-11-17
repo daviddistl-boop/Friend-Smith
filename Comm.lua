@@ -155,6 +155,10 @@ local function SendCharTo(key, what, channel, target)
         -- Zutaten der Rezepte (aeltere Versionen ignorieren "M")
         local mats = ns.ReagentPayload and ns.ReagentPayload(rec)
         if mats then Enqueue(table.concat({ PROTO, "M", key, mats }, ";"), channel, target) end
+        -- Fertigkeit und Levelvorschlaege je Beruf (Berufshilfe)
+        for _, p in ipairs(ns.ProfessionPayloads and ns.ProfessionPayloads(rec) or {}) do
+            Enqueue(table.concat({ PROTO, "P", key, p }, ";"), channel, target)
+        end
     end
 end
 
@@ -276,6 +280,8 @@ function ns.HandlePayload(sender, payload, channel)
             sfx[tonumber(slot)] = tonumber(v)
         end
         rec.suffix = sfx
+    elseif kind == "P" then
+        if ns.ParseProfession then ns.ParseProfession(rec, f) end
     elseif kind == "R" then
         local s = {}
         for id in (f[4] or ""):gmatch("%d+") do s[tonumber(id)] = true end

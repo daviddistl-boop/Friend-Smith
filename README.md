@@ -17,6 +17,7 @@ Languages: English and German (follows your game client).
   - **For me** – who can craft something better for you or your alts?
   - **I can craft** – who can you craft something better for with your professions (your alts, guild and friends)?
   - **Guild & friends** – everything at a glance.
+  - **Profession help** – who is leveling a profession, how many points to the next big step and which mats they need.
   - **Guild stock** – minimum amounts for the guild bank set by officers: what's missing, who can craft it and which mats are needed.
   - **Mat requests** – which mats your guild is looking for right now, and whether you have some.
   - **Buff food** – who can cook the best "Well Fed" food in each category (Stamina & Spirit, Agility, Strength, Intellect, Mana regeneration …), best first.

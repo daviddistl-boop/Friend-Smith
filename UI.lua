@@ -295,7 +295,8 @@ local rows, flat = {}, {}
 local offset, numRows = 0, 0
 local view, groupBy, query = "mine", "target", ""
 local selKey, selEntry
-local counts = { all = 0, mine = 0, help = 0, food = 0, requests = 0, stock = 0 }
+local counts = { all = 0, mine = 0, help = 0, food = 0, requests = 0, stock = 0, profs = 0 }
+local profEntries = {}
 local stockEntries = {}
 local reqEntries = {}
 local foodGroups = {}
@@ -306,6 +307,7 @@ local function EntryKey(e)
     if e.food then return "food#" .. e.itemID end
     if e.request then return "req#" .. e.r.id end
     if e.stock then return "stock#" .. e.itemID end
+    if e.prof then return "prof#" .. e.key .. ":" .. e.name end
     return e.target .. "#" .. e.itemID
 end
 
@@ -319,7 +321,9 @@ local function Matches(e)
     if query == "" then return true end
     local d = ns.ItemData(e.itemID)
     if d and d.name:lower():find(query, 1, true) then return true end
-    if e.stock then
+    if e.prof then
+        if e.name:lower():find(query, 1, true) then return true end
+    elseif e.stock then
         -- nur Name und Handwerker (unten)
     elseif e.request then
         if ns.ShortName(e.r.from):lower():find(query, 1, true) then return true end
@@ -376,6 +380,11 @@ function Rebuild()
         if selKey and EntryKey(e) == selKey then selEntry = e end
     end
     counts.requests = #reqEntries
+    profEntries = ns.ProfHelpList()
+    counts.profs = #profEntries
+    for _, e in ipairs(profEntries) do
+        if selKey and EntryKey(e) == selKey then selEntry = e end
+    end
     stockEntries = ns.StockList()
     counts.stock = 0
     for _, e in ipairs(stockEntries) do
@@ -385,7 +394,7 @@ function Rebuild()
     if not selEntry then selKey = nil end
 
     local groups, order = {}, {}
-    local grouped = view ~= "food" and view ~= "requests" and view ~= "stock"
+    local grouped = view ~= "food" and view ~= "requests" and view ~= "stock" and view ~= "profs"
     for _, e in ipairs(grouped and results or {}) do
         if InView(e, view) and Matches(e) then
             local keys
@@ -410,10 +419,10 @@ function Rebuild()
     end
     table.sort(order, GroupOrder)
 
-    if view == "requests" then
-        for _, e in ipairs(reqEntries) do
+    if view == "requests" or view == "profs" then
+        for _, e in ipairs(view == "profs" and profEntries or reqEntries) do
             if Matches(e) then
-                local k = e.r.from
+                local k = e.prof and e.key or e.r.from
                 if not groups[k] then groups[k] = {}; order[#order + 1] = k end
                 table.insert(groups[k], e)
             end
@@ -454,7 +463,7 @@ function Rebuild()
         end
     end
     for _, k in ipairs(order) do
-        local ck = (view == "requests" and "req" or groupBy) .. ":" .. k
+        local ck = ((view == "requests" or view == "profs") and view or groupBy) .. ":" .. k
         local closed = ns.S.collapsed[ck]
         flat[#flat + 1] = { kind = "h", key = k, ck = ck, n = #groups[k], closed = closed }
         if not closed then
@@ -471,6 +480,8 @@ function Rebuild()
     if #flat == 0 then
         if query ~= "" then
             list.empty:SetText(string.format(L["Nothing found for \"%s\"."], query))
+        elseif view == "profs" then
+            list.empty:SetText(L["No profession data yet.\n\nEveryone with Friendsmith 0.9 shares their skill\nwhen they open their profession window."])
         elseif view == "stock" then
             list.empty:SetText(ns.CanSetTargets() and L["No stock targets yet.\n\nAdd items above: shift-click an item\n(or type its name) and enter an amount."]
                 or L["Your guild hasn't set any stock targets yet.\n\nThe guild master and officers can set\nminimum amounts for the guild bank here."])
@@ -555,7 +566,17 @@ function RenderList()
                 r.icon:SetTexture(d and d.icon or EMPTY_ICON)
                 r.name:SetText(d and d.name or L["Loading …"])
                 r.name:SetTextColor(QualityColor(d and d.quality))
-                if e.stock then
+                if e.prof then
+                    r.name:SetText(e.name .. "  |cff8f96a8" .. e.p.rank .. "/" .. e.p.max .. "|r")
+                    r.name:SetTextColor(1, 1, 1)
+                    if e.plan.trainer then
+                        r.meta:SetText("|cffffd140" .. L["trainer"] .. "|r")
+                        r.gain:SetText("")
+                    else
+                        r.meta:SetText(string.format(L["to %d"], e.plan.target))
+                        r.gain:SetText("+" .. e.plan.points)
+                    end
+                elseif e.stock then
                     local col = e.missing > 0 and "|cffff6060" or "|cff5cdb6b"
                     r.meta:SetText(col .. e.have .. "|r / " .. e.target)
                     r.gain:SetText(e.missing > 0 and ("|cffff6060-" .. e.missing .. "|r") or "|cff5cdb6bOK|r")
@@ -695,6 +716,7 @@ local NAV = {
     { view = "food", label = L["Buff food"],      icon = "Interface\\Icons\\Spell_Misc_Food" },
     { view = "requests", label = L["Mat requests"], icon = "Interface\\Icons\\INV_Misc_Bag_10" },
     { view = "stock", label = L["Guild stock"], icon = "Interface\\Icons\\INV_Box_01" },
+    { view = "profs", label = L["Profession help"], icon = "Interface\\Icons\\INV_Misc_Note_02" },
 }
 
 local function CreateSidebar()
@@ -714,8 +736,8 @@ local function CreateSidebar()
     sidebar.nav = {}
     for i, n in ipairs(NAV) do
         local b = CreateFrame("Button", nil, sidebar)
-        b:SetHeight(26)
-        b:SetPoint("TOPLEFT", 8, -28 - (i - 1) * 28)
+        b:SetHeight(24)
+        b:SetPoint("TOPLEFT", 8, -28 - (i - 1) * 26)
         b:SetPoint("RIGHT", -8, 0)
         b.view = n.view
         b.sel = Fill(b, C.accentBg)
@@ -741,36 +763,37 @@ local function CreateSidebar()
     AddTooltip(sidebar.nav[1], L["For me"], L["Who can craft something better for you or your alts?"])
     AddTooltip(sidebar.nav[2], L["I can craft"], L["Who you can craft something better for with your professions – your alts and your guild."])
     AddTooltip(sidebar.nav[3], L["Guild & friends"], L["Everything anyone in your guild or among your friends can craft for anyone."])
+    AddTooltip(sidebar.nav[7], L["Profession help"], L["Who is leveling a profession and which mats they need for the next big step."])
     AddTooltip(sidebar.nav[6], L["Guild stock"], L["Minimum amounts for the guild bank – what's missing, who can craft it and which mats are needed."])
     AddTooltip(sidebar.nav[5], L["Mat requests"], L["Mats your guild is looking for right now – and whether you have some."])
     AddTooltip(sidebar.nav[4], L["Buff food"], L["Who can cook the best \"Well Fed\" food in each category – Stamina, Spirit, Agility and so on."])
 
     local flbl = SectionLabel(sidebar, L["FILTER"])
-    flbl:SetPoint("TOPLEFT", 14, -206)
+    flbl:SetPoint("TOPLEFT", 14, -214)
 
     sidebar.toggles = {}
     local t1 = MakeToggle(sidebar, L["Only my crafters"],
         function() return ns.S.onlyMine end,
         function(v) ns.S.onlyMine = v; ns.MarkDirty() end)
-    t1:SetPoint("TOPLEFT", 14, -222)
+    t1:SetPoint("TOPLEFT", 14, -230)
     t1:SetPoint("RIGHT", -10, 0)
     AddTooltip(t1, L["Only my crafters"], L["Only shows upgrades you can craft with your own characters."])
     local t2 = MakeToggle(sidebar, L["Lower armor types"],
         function() return ns.S.anyArmor end,
         function(v) ns.S.anyArmor = v; ns.MarkDirty() end)
-    t2:SetPoint("TOPLEFT", 14, -270)
+    t2:SetPoint("TOPLEFT", 14, -278)
     t2:SetPoint("RIGHT", -10, 0)
     AddTooltip(t2, L["Lower armor classes"], L["E.g. also suggests leather to a warrior, not just the best armor type."])
     local t3 = MakeToggle(sidebar, L["Profession window panel"],
         function() return not ns.S.hideProfPanel end,
         function(v) ns.S.hideProfPanel = (not v) or nil; if ns.RefreshProfPanel then ns.RefreshProfPanel() end end)
-    t3:SetPoint("TOPLEFT", 14, -326)
+    t3:SetPoint("TOPLEFT", 14, -334)
     t3:SetPoint("RIGHT", -10, 0)
     AddTooltip(t3, L["Profession window panel"], L["Shows next to the profession window what you can craft with this profession, and for whom."])
     local t4 = MakeToggle(sidebar, L["Rate by spec stats"],
         function() return ns.S.useStats end,
         function(v) ns.S.useStats = v; ns.MarkDirty() end)
-    t4:SetPoint("TOPLEFT", 14, -246)
+    t4:SetPoint("TOPLEFT", 14, -254)
     t4:SetPoint("RIGHT", -10, 0)
     AddTooltip(t4, L["Rating by spec stats"],
         L["Compares strength, agility, spell power etc., weighted by specialization "] ..
@@ -779,22 +802,22 @@ local function CreateSidebar()
     local t5 = MakeToggle(sidebar, L["Minimap button"],
         function() return not (ns.S.minimap and ns.S.minimap.hide) end,
         function(v) ns.SetMinimapShown(v) end)
-    t5:SetPoint("TOPLEFT", 14, -350)
+    t5:SetPoint("TOPLEFT", 14, -358)
     t5:SetPoint("RIGHT", -10, 0)
     local t6 = MakeToggle(sidebar, L["Share with friends"],
         function() return ns.S.shareFriends end,
         function(v) ns.S.shareFriends = v; ns.MarkDirty(); if v then ns.Hello(true) end end)
-    t6:SetPoint("TOPLEFT", 14, -374)
+    t6:SetPoint("TOPLEFT", 14, -382)
     t6:SetPoint("RIGHT", -10, 0)
     AddTooltip(t6, L["Share with friends"],
         L["Also exchanges data with people on your friend list who use Friendsmith, even if they aren't in your guild. Data is only accepted from people on your own friend list."])
     sidebar.toggles = { t1, t4, t2, t3, t5, t6 }
 
     local dl = Text(sidebar, 11, C.text)
-    dl:SetPoint("TOPLEFT", 14, -300)
+    dl:SetPoint("TOPLEFT", 14, -308)
     dl:SetText(L["Min. better"])
     local plus = MakeButton(sidebar, 20, 20, "+")
-    plus:SetPoint("TOPRIGHT", -10, -296)
+    plus:SetPoint("TOPRIGHT", -10, -304)
     sidebar.diffValue = Text(sidebar, 11, C.green, "CENTER")
     sidebar.diffValue:SetWidth(30)
     sidebar.diffValue:SetPoint("RIGHT", plus, "LEFT", -2, 0)
@@ -863,6 +886,20 @@ local function ShowStockTooltip(owner, e)
 end
 
 local function ShowEntryTooltip(owner, e)
+    if e.prof then
+        GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(CharName(e.key) .. " – " .. e.name .. " " .. e.p.rank .. "/" .. e.p.max, 1, 1, 1)
+        if e.plan.trainer then
+            GameTooltip:AddLine(string.format(L["Needs a trainer to go beyond %d."], e.p.max), 1, 0.82, 0.25, true)
+        else
+            GameTooltip:AddLine(string.format(L["%d points to %d"], e.plan.points, e.plan.target), 1, 0.82, 0.25)
+            local o = e.plan.options[1]
+            if o then GameTooltip:AddLine(string.format(L["Suggestion: ~%dx %s"], o.crafts, ItemLinkOrName(o.itemID)), 1, 1, 1, true) end
+        end
+        GameTooltip:AddLine(string.format(L["Updated %s ago"], AgeText(e.p.t)), 0.6, 0.6, 0.6)
+        GameTooltip:Show()
+        return
+    end
     if e.stock then return ShowStockTooltip(owner, e) end
     if e.request then return ShowRequestTooltip(owner, e) end
     if e.food then return ShowFoodTooltip(owner, e) end
@@ -1102,7 +1139,7 @@ end
 ---------------------------------------------------------------------------
 -- Detailbereich
 ---------------------------------------------------------------------------
-local ov, it, fd, rq, sk -- Uebersicht / Gegenstand / Essen / Mats-Gesuch / Gildenlager
+local ov, it, fd, rq, sk, ph -- Uebersicht / Gegenstand / Essen / Mats-Gesuch / Gildenlager / Berufshilfe
 
 -- Zutatenliste: "4x Dunkles Leder   du 3 · Bank 6  fehlt 1"
 local function CreateMatsBlock(parent, top, title)
@@ -1302,6 +1339,12 @@ local function RenderOverview()
     if counts.help > 0 then
         add(string.format(L["You can craft %d upgrades"], counts.help), L["For your alts and your guild – click here for the list."],
             function() SetView("help") end)
+    end
+    local leveling = 0
+    for _, e in ipairs(profEntries) do if not IsMine(e.key) and not e.plan.trainer then leveling = leveling + 1 end end
+    if leveling > 0 then
+        add(string.format(L["%d professions being leveled"], leveling), L["See who needs mats for the next step – click here."],
+            function() SetView("profs") end)
     end
     if counts.stock > 0 then
         add(string.format(L["Guild stock: %d items below target"], counts.stock),
@@ -1865,6 +1908,160 @@ local function RenderStock(e)
     sk.req:SetActive(sk.req.run ~= nil)
 end
 
+local function CreateProfView(parent)
+    ph = CreateFrame("Frame", nil, parent)
+    ph:SetAllPoints()
+    ph.opt = 1
+
+    local back = CreateFrame("Button", nil, ph)
+    back:SetSize(90, 18)
+    back:SetPoint("TOPRIGHT", -14, -12)
+    local bt = Text(back, 10, C.muted, "RIGHT")
+    bt:SetPoint("RIGHT")
+    bt:SetText(L["< Overview"])
+    back:SetScript("OnEnter", function() bt:SetTextColor(1, 1, 1) end)
+    back:SetScript("OnLeave", function() bt:SetTextColor(C.muted[1], C.muted[2], C.muted[3]) end)
+    back:SetScript("OnClick", function() Select(nil) end)
+
+    ph.title = Text(ph, 15)
+    ph.title:SetPoint("TOPLEFT", 18, -36)
+    ph.title:SetPoint("RIGHT", -110, 0)
+    ph.who = Text(ph, 11, C.muted)
+    ph.who:SetPoint("TOPLEFT", ph.title, "BOTTOMLEFT", 0, -6)
+
+    local sl = SectionLabel(ph, L["SKILL"])
+    sl:SetPoint("TOPLEFT", 18, -86)
+    ph.skill = Text(ph, 20, C.text)
+    ph.skill:SetPoint("TOPLEFT", 18, -100)
+    ph.step = Text(ph, 11, C.green)
+    ph.step:SetPoint("LEFT", ph.skill, "RIGHT", 12, -1)
+    ph.step:SetPoint("RIGHT", -18, 0)
+
+    local gl = SectionLabel(ph, L["SUGGESTION"])
+    gl:SetPoint("TOPLEFT", 18, -136)
+    ph.opts = {}
+    for i = 1, 4 do
+        local b = CreateFrame("Button", nil, ph)
+        b:SetHeight(18)
+        b:SetPoint("TOPLEFT", 18, -150 - (i - 1) * 19)
+        b:SetPoint("RIGHT", -18, 0)
+        b.sel = Fill(b, C.accentBg)
+        local hl = b:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetColorTexture(1, 1, 1, 0.05)
+        b.icon = Icon(b, 14)
+        b.icon:SetPoint("LEFT", 4, 0)
+        b.text = Text(b, 11)
+        b.text:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
+        b.text:SetPoint("RIGHT", -4, 0)
+        b:SetScript("OnClick", function(self)
+            if self.itemID and IsShiftKeyDown() then LinkInChat(self.itemID); return end
+            ph.opt = self.index
+            RenderDetail()
+        end)
+        b:SetScript("OnEnter", function(self)
+            if not self.itemID then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink("item:" .. self.itemID)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        b.index = i
+        ph.opts[i] = b
+    end
+    ph.note = Text(ph, 10, C.muted)
+    ph.note:SetPoint("TOPLEFT", 18, -150)
+    ph.note:SetPoint("RIGHT", -18, 0)
+    if ph.note.SetWordWrap then ph.note:SetWordWrap(true) end
+
+    ph.mats = CreateMatsBlock(ph, -236, L["MATS"])
+
+    ph.link = MakeButton(ph, 100, 26, L["Link in chat"])
+    ph.link:SetPoint("BOTTOMLEFT", 18, 14)
+    ph.link:SetScript("OnClick", function(self) if self.itemID then LinkInChat(self.itemID) end end)
+    ph.act = MakeButton(ph, 150, 26, L["Whisper: I can help"], true)
+    ph.act:SetPoint("BOTTOMRIGHT", -18, 14)
+    ph.act:SetScript("OnClick", function(self) if self.run then self.run() end end)
+end
+
+local function RenderProf(e)
+    if ph.lastKey ~= EntryKey(e) then ph.opt = 1; ph.lastKey = EntryKey(e) end
+    local p, plan = e.p, e.plan
+    ph.title:SetText(e.name)
+    ph.who:SetText(CharName(e.key) .. "  " .. Tag(e.key) .. "  ·  " .. string.format(L["updated %s ago"], AgeText(p.t)))
+    ph.skill:SetText(p.rank .. " / " .. p.max)
+
+    local opt = plan.options[ph.opt] or plan.options[1]
+    if plan.trainer then
+        ph.step:SetText("|cffffd140" .. string.format(L["Needs a trainer to go beyond %d."], p.max) .. "|r")
+    else
+        ph.step:SetText(string.format(L["%d points to %d"], plan.points, plan.target))
+    end
+
+    for i, b in ipairs(ph.opts) do
+        local o = plan.options[i]
+        if o and not plan.trainer then
+            local d = ns.ItemData(o.itemID)
+            b.itemID = o.itemID
+            b.icon:SetTexture(d and d.icon or EMPTY_ICON)
+            local col = o.color == "o" and "|cffff8040" or "|cffffff00"
+            b.text:SetText(string.format("~%dx %s  %s(%s)|r", o.crafts, d and d.name or "…", col,
+                o.color == "o" and L["orange"] or L["yellow"]))
+            b.sel:SetShown(o == opt)
+            b:Show()
+        else
+            b:Hide()
+        end
+    end
+    if plan.trainer then
+        ph.note:SetText(L["Visit a trainer to learn the next rank – after that new recipes become orange again."])
+    elseif #plan.options == 0 then
+        ph.note:SetText(L["No orange or yellow recipes with known mats. The player may need new recipes from a trainer or vendor."])
+    else
+        ph.note:SetText("")
+    end
+    ph.note:SetShown(ph.note:GetText() ~= "")
+
+    local missing
+    if opt and not plan.trainer then
+        missing = RenderMats(ph.mats, opt.mats)
+        ph.mats.label:Show()
+        ph.mats.note:Show()
+    else
+        for _, row in ipairs(ph.mats.rows) do row:Hide() end
+        ph.mats.empty:Hide()
+        ph.mats.label:Hide()
+        ph.mats.note:Hide()
+    end
+
+    ph.link.itemID = opt and opt.itemID
+    ph.link:SetActive(opt ~= nil and not plan.trainer)
+    ph.act.run = nil
+    if IsMine(e.key) then
+        ph.act.label:SetText(L["Ask for mats"])
+        if opt and missing and #missing > 0 and IsInGuild() then
+            ph.act.run = function() AskGuildForMats(opt.itemID, missing) end
+        elseif missing and #missing == 0 then
+            ph.act.label:SetText(L["Mats complete"])
+        end
+    elseif opt and not plan.trainer then
+        ph.act.label:SetText(L["Whisper: I can help"])
+        ph.act.run = function()
+            local have = {}
+            for _, m in ipairs(opt.mats or {}) do
+                local own = ns.OwnCount(m[1])
+                if own > 0 then have[#have + 1] = math.min(own, m[2]) .. "x " .. ItemLinkOrName(m[1]) end
+            end
+            Whisper(e.key, ns.Subst(L["Hi! I saw you're leveling {prof} ({rank}/{max}). I can help with mats for {item}: {mats}"],
+                { prof = e.name, rank = p.rank, max = p.max, item = ItemLinkOrName(opt.itemID),
+                  mats = #have > 0 and table.concat(have, ", ") or L["some of it"] }))
+        end
+    else
+        ph.act.label:SetText(L["Whisper: I can help"])
+    end
+    ph.act:SetActive(ph.act.run ~= nil)
+end
+
 local function CreateRequestView(parent)
     rq = CreateFrame("Frame", nil, parent)
     rq:SetAllPoints()
@@ -1949,8 +2146,11 @@ end
 
 function RenderDetail()
     if not detail then return end
-    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide(); sk:Hide()
-    if selEntry and selEntry.stock then
+    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide(); sk:Hide(); ph:Hide()
+    if selEntry and selEntry.prof then
+        ph:Show()
+        RenderProf(selEntry)
+    elseif selEntry and selEntry.stock then
         sk:Show()
         RenderStock(selEntry)
     elseif selEntry and selEntry.request then
@@ -1978,6 +2178,7 @@ local function CreateDetail()
     CreateFoodView(detail)
     CreateRequestView(detail)
     CreateStockView(detail)
+    CreateProfView(detail)
 end
 
 ---------------------------------------------------------------------------

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0
+- **Profession help:** new view that shows who in your guild, among your friends and alts is leveling a profession.
+  For each profession it shows the skill (e.g. 132/150), the points to the next big step (75/150/225/300)
+  and a suggestion like "~18x Dark Leather Boots (orange)" with the mats needed – including what you and the guild bank have.
+- Helpers get a whisper button with the mats they can offer; for your own characters you can ask the guild for the missing mats.
+- Shows when a player needs a trainer before they can level further.
+- Skill and recipe colors are recorded when the profession window is opened, so everyone needs to open it once after updating.
+  Yellow recipes are counted as roughly two crafts per point – it's an estimate.
+
 ## 0.8.0
 - **Guild stock:** the guild master and officers can set minimum amounts for the guild bank
   (potions, food, bandages, bars …). The new *Guild stock* view shows what's below target, who can craft it
