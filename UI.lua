@@ -210,13 +210,6 @@ local function FirstForeign(list)
     for _, k in ipairs(list) do if not IsMine(k) then return k end end
 end
 
-local function WhisperName(key)
-    local realm = key:match("%-([^%-]+)$")
-    local mine = ns.PlayerKey():match("%-([^%-]+)$")
-    if realm and realm == mine then return ns.ShortName(key) end
-    return key
-end
-
 local function OpenChat(text)
     if ChatFrame_OpenChat then
         ChatFrame_OpenChat(text)
@@ -225,12 +218,34 @@ local function OpenChat(text)
     end
 end
 
-local function Whisper(key, msg)
-    OpenChat("/w " .. WhisperName(key) .. " " .. (msg or ""))
+-- Ziel zum Fluestern: am besten der Absendername, wie ihn der Server bei der letzten Addon-Nachricht
+-- gemeldet hat. Den Realm haengen wir selbst nie an – WoW Forever kennt die API-Realmnamen nicht.
+local function WhisperTarget(key, sender)
+    local r = Rec(key)
+    local s = sender or (r and r.sender)
+    if s and s ~= "" then
+        return (s:gsub("%-[^%-]*$", ""))
+    end
+    return ns.ShortName(key)
+end
+
+local function Whisper(key, msg, sender)
+    local target = WhisperTarget(key, sender)
+    msg = msg or ""
+    -- Fluesterfenster direkt oeffnen (klappt auch mit Leerzeichen im Namen)
+    if ChatFrame_SendTell and ChatEdit_GetActiveWindow then
+        ChatFrame_SendTell(target)
+        local eb = ChatEdit_GetActiveWindow()
+        if eb then
+            eb:Insert(msg)
+            return
+        end
+    end
+    OpenChat("/w " .. target .. " " .. msg)
 end
 
 local function AgeText(t)
-    local s = math.max(0, time() - (t or 0))
+    local s = math.max(0, ns.Now() - (t or 0))
     if s < 3600 then return string.format(L["%d min"], math.max(1, math.floor(s / 60))) end
     if s < 86400 then return string.format(L["%d h"], math.floor(s / 3600)) end
     return string.format(L["%d d"], math.floor(s / 86400))
@@ -1632,7 +1647,7 @@ local function RenderRequest(e)
         rq.act.label:SetText(L["Whisper: I can help"])
         rq.act.run = function()
             Whisper(r.from, ns.Subst(L["Hi! I saw your Friendsmith request for {item}. I can help with: {mats}"],
-                { item = ItemLinkOrName(r.item), mats = #have > 0 and table.concat(have, ", ") or L["some of it"] }))
+                { item = ItemLinkOrName(r.item), mats = #have > 0 and table.concat(have, ", ") or L["some of it"] }), r.sender)
         end
     end
     rq.act:SetActive(rq.act.run ~= nil)
@@ -1787,6 +1802,9 @@ SlashCmdList.FRIENDSMITH = function(msg)
         local show = ns.S.minimap and ns.S.minimap.hide
         ns.SetMinimapShown(show and true or false)
         ns.Print(show and L["Minimap button shown."] or L["Minimap button hidden."])
+    elseif msg == "debug" then
+        ns.S.debug = not ns.S.debug or nil
+        ns.Print(ns.S.debug and L["Debug on: incoming Friendsmith messages are shown in chat."] or L["Debug off."])
     elseif msg == "reset" then
         for k, rec in pairs(FriendsmithDB.chars) do
             if not rec.mine then FriendsmithDB.chars[k] = nil end

@@ -16,6 +16,8 @@ local LOCALE = GetLocale and GetLocale() or "enUS"
 if FriendsmithLocaleOverride then LOCALE = FriendsmithLocaleOverride end
 
 if LOCALE == "deDE" then
+    L["Debug on: incoming Friendsmith messages are shown in chat."] = "Debug an: eingehende Friendsmith-Nachrichten werden im Chat angezeigt."
+    L["Debug off."] = "Debug aus."
     L["%d min"] = "%d Min."
     L["%d h"] = "%d Std."
     L["%d d"] = "%d Tg."

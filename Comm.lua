@@ -60,9 +60,37 @@ end
 
 ns.NormalizeName = Normalize
 
+-- Gleicher Spieler? WoW Forever liefert je nach Client unterschiedliche Realm-Namen
+-- (z. B. interne Servernamen), deshalb nur den Charakternamen vergleichen.
+-- Bei Namen mit Nachnamen ("Vorname Nachname") zaehlt auch der Vorname allein.
+local function BareName(name)
+    name = tostring(name or ""):gsub("%-[^%-]*$", "")
+    return name:lower()
+end
+function ns.SameName(a, b)
+    local x, y = BareName(a), BareName(b)
+    if x == "" or y == "" then return false end
+    if x == y then return true end
+    if x:gsub("%s", "") == y:gsub("%s", "") then return true end
+    local fx, fy = x:match("^(%S+)"), y:match("^(%S+)")
+    return fx ~= nil and fx == fy
+end
+
+-- Serverzeit statt PC-Uhr (die kann bei jedem Spieler anders gehen)
+function ns.Now()
+    return (GetServerTime and GetServerTime()) or time()
+end
+
+function ns.Debug(msg)
+    if ns.S and ns.S.debug then ns.Print("|cff8f96a8[debug]|r " .. tostring(msg)) end
+end
+
 local function IsFriend(sender)
-    local key = Normalize(sender)
-    return key ~= nil and ns.FriendList()[key] ~= nil
+    if not sender then return false end
+    for name in pairs(ns.FriendList()) do
+        if ns.SameName(name, sender) then return true end
+    end
+    return false
 end
 
 ---------------------------------------------------------------------------
@@ -195,6 +223,7 @@ function ns.HandlePayload(sender, payload, channel)
     local f = { strsplit(";", payload) }
     if f[1] ~= PROTO then return end
     local kind = f[2]
+    ns.Debug(string.format("%s von %s (%s), %d Zeichen", tostring(kind), tostring(sender), channel, #payload))
 
     if kind == "Q" then
         if channel == "GUILD" then

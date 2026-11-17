@@ -65,6 +65,7 @@ Languages: English and German (follows your game client).
 | `/fsmith diff 3` | Only count +3 item levels (or +3 % with spec rating) as an upgrade (default: 1) |
 | `/fsmith armor` | Also suggest lower armor types (on/off) |
 | `/fsmith minimap` | Show/hide the minimap button |
+| `/fsmith debug` | Show incoming Friendsmith messages in chat (on/off) |
 | `/fsmith reset` | Delete stored data of other guild members |
 | `/fsmith help` | List all commands |
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.1
+- Fixed: mat requests from guild members didn't show up. WoW Forever reports realm names differently
+  on each client, so requests were wrongly rejected – names are now compared without the realm.
+- Fixed: whisper buttons added a realm name that WoW Forever doesn't recognize ("No player named … is online").
+  Whispers now go to the character name only and also work with surnames.
+- Friends sync also compares names without the realm now.
+- Request times use the server time instead of each player's PC clock.
+- New command `/fsmith debug` shows incoming Friendsmith messages in chat (helps with bug reports).
+
 ## 0.7.0
 - **Mats:** the details of an upgrade now list the mats it needs – how many you have (bags and bank of all your
   characters), how many are in the guild bank and what's still missing.

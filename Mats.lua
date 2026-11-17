@@ -226,7 +226,7 @@ local function ScanGuildBank()
             end
             -- noch nicht geladene Faecher sind leer; ein leeres Fach zaehlt nur, wenn es gerade offen ist
             if filled or tab == cur then
-                g[tab] = { t = time(), by = ns.PlayerKey(), items = items }
+                g[tab] = { t = ns.Now(), by = ns.PlayerKey(), items = items }
                 pendingTabs[tab] = true
                 any = true
             end
@@ -254,7 +254,7 @@ end
 ---------------------------------------------------------------------------
 -- Mats-Gesuche
 ---------------------------------------------------------------------------
-local function Expired(r) return (time() - (r.t or 0)) > REQUEST_DAYS * 86400 end
+local function Expired(r) return (ns.Now() - (r.t or 0)) > REQUEST_DAYS * 86400 end
 
 local function SendRequest(r)
     if ns.Enqueue then
@@ -277,7 +277,8 @@ function ns.OpenRequests()
     for id, r in pairs(d.requests) do
         if Expired(r) then
             d.requests[id] = nil
-        elseif guild and r.guild == guild then
+        elseif guild and (r.guild == guild or r.guild == "?") then
+            r.guild = guild
             out[#out + 1] = r
         end
     end
@@ -295,7 +296,7 @@ function ns.CreateRequest(itemID, mats)
     for id, r in pairs(DB().requests) do
         if r.from == key and r.item == itemID then DB().requests[id] = nil end
     end
-    local t = time()
+    local t = ns.Now()
     local r = { id = key .. ":" .. t, from = key, item = itemID, mats = list, t = t, guild = guild }
     DB().requests[r.id] = r
     TrimFrom(key)
@@ -334,20 +335,27 @@ function ns.HandleExtra(kind, f, sender, channel)
     if kind == "B" then
         local tab, t = tonumber(f[3]), tonumber(f[4])
         local g = MyBank()
-        if not g or not tab or tab < 1 or tab > 8 or not t or t > time() + 600 then return true end
+        if not g or not tab or tab < 1 or tab > 8 or not t or t > ns.Now() + 3600 then return true end
         if g[tab] and g[tab].t >= t then return true end
         local items = {}
         for id, n in (f[5] or ""):gmatch("(%d+):(%d+)") do items[tonumber(id)] = tonumber(n) end
         g[tab] = { t = t, by = ns.NormalizeName(sender), items = items }
     else
         local key = f[3]
-        if not key or key ~= ns.NormalizeName(sender) then return true end -- nur eigene Gesuche
+        if not key or not ns.SameName(key, sender) then -- nur eigene Gesuche
+            ns.Debug(string.format("Gesuch verworfen: Name %s passt nicht zu Absender %s", tostring(key), tostring(sender)))
+            return true
+        end
         if kind == "A" then
             local item, t = tonumber(f[4]), tonumber(f[5])
             local mats = ParseMats(f[6])
-            if not item or not t or #mats == 0 or t > time() + 600 then return true end
-            local r = { id = key .. ":" .. t, from = key, item = item, mats = mats, t = t, guild = GetGuildInfo("player") }
-            if Expired(r) then return true end
+            if not item or not t or #mats == 0 or t > ns.Now() + 3600 then
+                ns.Debug("Gesuch verworfen: ungueltige Daten oder Zeit")
+                return true
+            end
+            local r = { id = key .. ":" .. t, from = key, sender = sender, item = item, mats = mats, t = t,
+                        guild = GetGuildInfo("player") or "?" }
+            if Expired(r) then ns.Debug("Gesuch verworfen: abgelaufen"); return true end
             for id, old in pairs(DB().requests) do
                 if old.from == key and old.item == item and old.t < t then DB().requests[id] = nil end
             end
@@ -370,7 +378,7 @@ function ns.BroadcastExtra()
     local g = MyBank()
     if g then
         for tab, data in pairs(g) do
-            if data.by == me and time() - data.t < 2 * 86400 then SendTab(tab) end
+            if data.by == me and ns.Now() - data.t < 2 * 86400 then SendTab(tab) end
         end
     end
 end
