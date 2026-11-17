@@ -1937,10 +1937,10 @@ local function CreateProfView(parent)
     ph.step:SetPoint("LEFT", ph.skill, "RIGHT", 12, -1)
     ph.step:SetPoint("RIGHT", -18, 0)
 
-    local gl = SectionLabel(ph, L["SUGGESTION"])
-    gl:SetPoint("TOPLEFT", 18, -136)
+    ph.sugLabel = SectionLabel(ph, L["SUGGESTION"])
+    ph.sugLabel:SetPoint("TOPLEFT", 18, -136)
     ph.opts = {}
-    for i = 1, 4 do
+    for i = 1, 5 do
         local b = CreateFrame("Button", nil, ph)
         b:SetHeight(18)
         b:SetPoint("TOPLEFT", 18, -150 - (i - 1) * 19)
@@ -1956,6 +1956,9 @@ local function CreateProfView(parent)
         b.text:SetPoint("RIGHT", -4, 0)
         b:SetScript("OnClick", function(self)
             if self.itemID and IsShiftKeyDown() then LinkInChat(self.itemID); return end
+            local e = selEntry
+            local o = e and e.plan and e.plan.options[self.index]
+            if o and o.train then return end
             ph.opt = self.index
             RenderDetail()
         end)
@@ -1974,7 +1977,7 @@ local function CreateProfView(parent)
     ph.note:SetPoint("RIGHT", -18, 0)
     if ph.note.SetWordWrap then ph.note:SetWordWrap(true) end
 
-    ph.mats = CreateMatsBlock(ph, -236, L["MATS"])
+    ph.mats = CreateMatsBlock(ph, -252, L["MATS"])
 
     ph.link = MakeButton(ph, 100, 26, L["Link in chat"])
     ph.link:SetPoint("BOTTOMLEFT", 18, 14)
@@ -1992,21 +1995,36 @@ local function RenderProf(e)
     ph.skill:SetText(p.rank .. " / " .. p.max)
 
     local opt = plan.options[ph.opt] or plan.options[1]
+    if opt and opt.train then opt = plan.options[1] end
     if plan.trainer then
         ph.step:SetText("|cffffd140" .. string.format(L["Needs a trainer to go beyond %d."], p.max) .. "|r")
     else
         ph.step:SetText(string.format(L["%d points to %d"], plan.points, plan.target))
     end
 
+    ph.sugLabel:SetText(plan.guide and L["ROUTE (ONEFORALL)"] or L["SUGGESTION"])
     for i, b in ipairs(ph.opts) do
         local o = plan.options[i]
         if o and not plan.trainer then
-            local d = ns.ItemData(o.itemID)
             b.itemID = o.itemID
-            b.icon:SetTexture(d and d.icon or EMPTY_ICON)
-            local col = o.color == "o" and "|cffff8040" or "|cffffff00"
-            b.text:SetText(string.format("~%dx %s  %s(%s)|r", o.crafts, d and d.name or "…", col,
-                o.color == "o" and L["orange"] or L["yellow"]))
+            if o.train then
+                b.icon:SetTexture("Interface\\Icons\\INV_Misc_Book_11")
+                b.text:SetText("|cffffd140" .. string.format(L["at %d: visit the trainer (up to %d)"], o.at, o.cap) .. "|r")
+            elseif o.total then
+                b.icon:SetTexture("Interface\\Icons\\INV_Misc_Bag_08")
+                b.text:SetText(string.format(L["Whole route: ~%d crafts to %d"], o.crafts, plan.target))
+            else
+                local d = ns.ItemData(o.itemID)
+                b.icon:SetTexture(d and d.icon or EMPTY_ICON)
+                if o.color == "g" then
+                    b.text:SetText(string.format("%d–%d  ~%dx %s", o.from, o.to, o.crafts, d and d.name or "…")
+                        .. (o.learn and ("  |cffffd140(" .. L["learn first"] .. ")|r") or ""))
+                else
+                    local col = o.color == "o" and "|cffff8040" or "|cffffff00"
+                    b.text:SetText(string.format("~%dx %s  %s(%s)|r", o.crafts, d and d.name or "…", col,
+                        o.color == "o" and L["orange"] or L["yellow"]))
+                end
+            end
             b.sel:SetShown(o == opt)
             b:Show()
         else

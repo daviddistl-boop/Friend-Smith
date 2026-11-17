@@ -16,6 +16,10 @@ local LOCALE = GetLocale and GetLocale() or "enUS"
 if FriendsmithLocaleOverride then LOCALE = FriendsmithLocaleOverride end
 
 if LOCALE == "deDE" then
+    L["ROUTE (ONEFORALL)"] = "ROUTE (ONEFORALL)"
+    L["at %d: visit the trainer (up to %d)"] = "ab %d: zum Lehrer (bis %d)"
+    L["Whole route: ~%d crafts to %d"] = "Ganze Route: ca. %d Herstellungen bis %d"
+    L["learn first"] = "erst lernen"
     L["No profession data yet.\n\nEveryone with Friendsmith 0.9 shares their skill\nwhen they open their profession window."] = "Noch keine Berufsdaten.\n\nJeder mit Friendsmith 0.9 teilt seine Fertigkeit,\nsobald er sein Berufsfenster öffnet."
     L["trainer"] = "Lehrer"
     L["to %d"] = "bis %d"

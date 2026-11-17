@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.1
+- **Profession help with OneForAll:** if you have OneForAll installed, Friendsmith asks its Skill-Up Helper for the
+  route to your next big step and shows it in *Profession help* – the steps with their crafts, trainer visits,
+  recipes you still have to learn and the mats for the whole route.
+- The route is shared with your guild and friends, so they see it (and can help with mats) even without OneForAll.
+- Friendsmith only calls OneForAll's planner while you play; no OneForAll data is included in Friendsmith.
+
 ## 0.9.0
 - **Profession help:** new view that shows who in your guild, among your friends and alts is leveling a profession.
   For each profession it shows the skill (e.g. 132/150), the points to the next big step (75/150/225/300)

@@ -109,9 +109,20 @@ end
 function ns.ReagentPayload(rec)
     local d = DB()
     local parts = {}
-    for itemID in pairs(rec.recipes or {}) do
+    local seen = {}
+    local function add(itemID)
         local r = d.reagents[itemID]
-        if r then parts[#parts + 1] = itemID .. "=" .. Serialize(r) end
+        if r and not seen[itemID] then
+            seen[itemID] = true
+            parts[#parts + 1] = itemID .. "=" .. Serialize(r)
+        end
+    end
+    for itemID in pairs(rec.recipes or {}) do add(itemID) end
+    -- auch Rezepte aus der Leveling-Route, die der Spieler erst noch lernen muss
+    for _, p in pairs(rec.profs or {}) do
+        for _, s in ipairs(p.guide or {}) do
+            if s.item then add(s.item) end
+        end
     end
     if #parts == 0 then return nil end
     return table.concat(parts, ",")
