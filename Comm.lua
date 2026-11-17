@@ -187,6 +187,7 @@ function ns.BroadcastAll()
         if rec.mine and rec.guild == myGuild then SendCharTo(key, nil, "GUILD") end
     end
     if ns.BroadcastExtra then ns.BroadcastExtra() end
+    if ns.BroadcastStock then ns.BroadcastStock() end
 end
 
 -- Alle eigenen Charaktere an einen Freund.
@@ -243,6 +244,7 @@ function ns.HandlePayload(sender, payload, channel)
 
     -- Zutaten, Gildenbank, Mats-Gesuche (Mats.lua)
     if ns.HandleExtra and ns.HandleExtra(kind, f, sender, channel) then return end
+    if ns.HandleStock and ns.HandleStock(kind, f, sender, channel) then return end
 
     local key = f[3]
     if not key or key == "" then return end

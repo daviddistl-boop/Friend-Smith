@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0
+- **Guild stock:** the guild master and officers can set minimum amounts for the guild bank
+  (potions, food, bandages, bars …). The new *Guild stock* view shows what's below target, who can craft it
+  and which mats are needed for the missing amount – with a button to ask the guild for those mats.
+- Stock targets are shared with the guild and only accepted from the guild master and officers.
+- Add targets with the input above the list (shift-click an item) or with `/fsmith target [item] 40`.
+- Recipes for consumables and trade goods (potions, bandages, bars, cloth …) from all professions are now recorded too.
+  Open your profession windows once after updating.
+- Buff food detection now requires the "Well Fed" buff, so elixirs are no longer mistaken for food.
+
 ## 0.7.1
 - Fixed: mat requests from guild members didn't show up. WoW Forever reports realm names differently
   on each client, so requests were wrongly rejected – names are now compared without the realm.

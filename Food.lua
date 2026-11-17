@@ -18,6 +18,9 @@ local STATS = {
 }
 
 local USE_PREFIX = ITEM_SPELL_TRIGGER_ONUSE -- "Benutzen:" / "Use:"
+-- Name des Buffs "Satt" / "Well Fed" aus dem Client
+local WELL_FED = ((C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(19705))
+    or (GetSpellInfo and GetSpellInfo(19705)) or "Well Fed"):lower()
 
 ---------------------------------------------------------------------------
 -- Tooltip-Text eines Gegenstands lesen
@@ -79,6 +82,10 @@ function ns.FoodBuff(itemID)
     if not text then return nil end -- Tooltip noch leer: spaeter nochmal versuchen
 
     local low = text:lower()
+    if not low:find(WELL_FED, 1, true) and not low:find("well fed", 1, true) then
+        cache[itemID] = false -- kein Essen-Buff (z. B. Elixier)
+        return nil
+    end
     local keys, labels, amount, firstPos = {}, {}, 0, nil
     for _, s in ipairs(STATS) do
         local pos = low:find(s.name:lower(), 1, true)

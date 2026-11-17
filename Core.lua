@@ -402,14 +402,15 @@ local function IsCookingWindow()
 end
 ns.IsCookingWindow = IsCookingWindow
 
--- Gekochtes Essen (Verbrauchsgut) merken wir uns fuer die Buff-Essen-Ansicht
-local function IsFood(itemID)
+-- Verbrauchsgueter (Essen, Traenke, Verbaende …) und Handwerkswaren (Barren, Stoffballen …)
+-- merken wir uns fuer Buff-Essen und Gildenlager
+local function IsSupply(itemID)
     local _, _, _, equipLoc, _, classID = GetItemInfoInstant(itemID)
-    return classID == 0 and (not equipLoc or equipLoc == "")
+    return (classID == 0 or classID == 7) and (not equipLoc or equipLoc == "")
 end
 
-local function AddRecipe(rec, itemID, cooking)
-    if itemID and (IsGear(itemID) or (cooking and IsFood(itemID))) and not rec.recipes[itemID] then
+local function AddRecipe(rec, itemID)
+    if itemID and (IsGear(itemID) or IsSupply(itemID)) and not rec.recipes[itemID] then
         rec.recipes[itemID] = true
         return 1
     end
@@ -470,9 +471,8 @@ function ns.ScanRecipes(verbose)
 
     local map = ns.CurrentRecipes()
     if not map then return end
-    local cooking = IsCookingWindow()
     for itemID in pairs(map) do
-        added = added + AddRecipe(rec, itemID, cooking)
+        added = added + AddRecipe(rec, itemID)
     end
     local newMats = ns.RecordReagents and ns.RecordReagents(map, rec) or 0
 

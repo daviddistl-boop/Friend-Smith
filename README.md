@@ -17,6 +17,7 @@ Languages: English and German (follows your game client).
   - **For me** – who can craft something better for you or your alts?
   - **I can craft** – who can you craft something better for with your professions (your alts, guild and friends)?
   - **Guild & friends** – everything at a glance.
+  - **Guild stock** – minimum amounts for the guild bank set by officers: what's missing, who can craft it and which mats are needed.
   - **Mat requests** – which mats your guild is looking for right now, and whether you have some.
   - **Buff food** – who can cook the best "Well Fed" food in each category (Stamina & Spirit, Agility, Strength, Intellect, Mana regeneration …), best first.
 
@@ -65,6 +66,8 @@ Languages: English and German (follows your game client).
 | `/fsmith diff 3` | Only count +3 item levels (or +3 % with spec rating) as an upgrade (default: 1) |
 | `/fsmith armor` | Also suggest lower armor types (on/off) |
 | `/fsmith minimap` | Show/hide the minimap button |
+| `/fsmith stock` | Open the guild stock |
+| `/fsmith target [item] 40` | Set a stock target, officers only (0 removes it) |
 | `/fsmith debug` | Show incoming Friendsmith messages in chat (on/off) |
 | `/fsmith reset` | Delete stored data of other guild members |
 | `/fsmith help` | List all commands |

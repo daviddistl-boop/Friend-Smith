@@ -295,7 +295,8 @@ local rows, flat = {}, {}
 local offset, numRows = 0, 0
 local view, groupBy, query = "mine", "target", ""
 local selKey, selEntry
-local counts = { all = 0, mine = 0, help = 0, food = 0, requests = 0 }
+local counts = { all = 0, mine = 0, help = 0, food = 0, requests = 0, stock = 0 }
+local stockEntries = {}
 local reqEntries = {}
 local foodGroups = {}
 
@@ -304,6 +305,7 @@ local Rebuild, RenderList, RenderDetail
 local function EntryKey(e)
     if e.food then return "food#" .. e.itemID end
     if e.request then return "req#" .. e.r.id end
+    if e.stock then return "stock#" .. e.itemID end
     return e.target .. "#" .. e.itemID
 end
 
@@ -317,7 +319,9 @@ local function Matches(e)
     if query == "" then return true end
     local d = ns.ItemData(e.itemID)
     if d and d.name:lower():find(query, 1, true) then return true end
-    if e.request then
+    if e.stock then
+        -- nur Name und Handwerker (unten)
+    elseif e.request then
         if ns.ShortName(e.r.from):lower():find(query, 1, true) then return true end
         for _, m in ipairs(e.r.mats) do
             local md = ns.ItemData(m[1])
@@ -372,10 +376,16 @@ function Rebuild()
         if selKey and EntryKey(e) == selKey then selEntry = e end
     end
     counts.requests = #reqEntries
+    stockEntries = ns.StockList()
+    counts.stock = 0
+    for _, e in ipairs(stockEntries) do
+        if e.missing > 0 then counts.stock = counts.stock + 1 end
+        if selKey and EntryKey(e) == selKey then selEntry = e end
+    end
     if not selEntry then selKey = nil end
 
     local groups, order = {}, {}
-    local grouped = view ~= "food" and view ~= "requests"
+    local grouped = view ~= "food" and view ~= "requests" and view ~= "stock"
     for _, e in ipairs(grouped and results or {}) do
         if InView(e, view) and Matches(e) then
             local keys
@@ -428,6 +438,21 @@ function Rebuild()
             end
         end
     end
+    if view == "stock" then
+        local low, ok = {}, {}
+        for _, e in ipairs(stockEntries) do
+            if Matches(e) then table.insert(e.missing > 0 and low or ok, e) end
+        end
+        for _, g in ipairs({ { "stock:low", L["Below target"], low }, { "stock:ok", L["Stocked"], ok } }) do
+            if #g[3] > 0 then
+                local closed = ns.S.collapsed[g[1]]
+                flat[#flat + 1] = { kind = "h", label = g[2], ck = g[1], n = #g[3], closed = closed }
+                if not closed then
+                    for _, e in ipairs(g[3]) do flat[#flat + 1] = { kind = "i", e = e } end
+                end
+            end
+        end
+    end
     for _, k in ipairs(order) do
         local ck = (view == "requests" and "req" or groupBy) .. ":" .. k
         local closed = ns.S.collapsed[ck]
@@ -446,6 +471,9 @@ function Rebuild()
     if #flat == 0 then
         if query ~= "" then
             list.empty:SetText(string.format(L["Nothing found for \"%s\"."], query))
+        elseif view == "stock" then
+            list.empty:SetText(ns.CanSetTargets() and L["No stock targets yet.\n\nAdd items above: shift-click an item\n(or type its name) and enter an amount."]
+                or L["Your guild hasn't set any stock targets yet.\n\nThe guild master and officers can set\nminimum amounts for the guild bank here."])
         elseif view == "requests" then
             list.empty:SetText(L["No open mat requests in your guild.\n\nIn the details of an upgrade you can\nask your guild for missing mats."])
         elseif view == "food" then
@@ -472,6 +500,7 @@ function Rebuild()
 
     -- Gruppieren-Schalter
     list.groupLabel:SetShown(grouped)
+    list.addBar:SetShown(view == "stock" and ns.CanSetTargets())
     for _, sb in ipairs(list.seg) do
         sb:SetShown(grouped)
         local on = (sb.mode == groupBy)
@@ -509,7 +538,7 @@ function RenderList()
 
             if isHeader then
                 r.exp:SetTexture(it.closed and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
-                if it.food then
+                if it.label then
                     r.title:SetText("|cffffd140" .. it.label .. "|r")
                     r.sub:SetText("")
                 else
@@ -526,7 +555,11 @@ function RenderList()
                 r.icon:SetTexture(d and d.icon or EMPTY_ICON)
                 r.name:SetText(d and d.name or L["Loading …"])
                 r.name:SetTextColor(QualityColor(d and d.quality))
-                if e.request then
+                if e.stock then
+                    local col = e.missing > 0 and "|cffff6060" or "|cff5cdb6b"
+                    r.meta:SetText(col .. e.have .. "|r / " .. e.target)
+                    r.gain:SetText(e.missing > 0 and ("|cffff6060-" .. e.missing .. "|r") or "|cff5cdb6bOK|r")
+                elseif e.request then
                     local help = false
                     if not IsMine(e.r.from) then
                         for _, m in ipairs(e.r.mats) do if ns.OwnCount(m[1]) > 0 then help = true end end
@@ -661,6 +694,7 @@ local NAV = {
     { view = "all",  label = L["Guild & friends"],      icon = "Interface\\Icons\\INV_Misc_Book_09" },
     { view = "food", label = L["Buff food"],      icon = "Interface\\Icons\\Spell_Misc_Food" },
     { view = "requests", label = L["Mat requests"], icon = "Interface\\Icons\\INV_Misc_Bag_10" },
+    { view = "stock", label = L["Guild stock"], icon = "Interface\\Icons\\INV_Box_01" },
 }
 
 local function CreateSidebar()
@@ -680,8 +714,8 @@ local function CreateSidebar()
     sidebar.nav = {}
     for i, n in ipairs(NAV) do
         local b = CreateFrame("Button", nil, sidebar)
-        b:SetHeight(30)
-        b:SetPoint("TOPLEFT", 8, -28 - (i - 1) * 32)
+        b:SetHeight(26)
+        b:SetPoint("TOPLEFT", 8, -28 - (i - 1) * 28)
         b:SetPoint("RIGHT", -8, 0)
         b.view = n.view
         b.sel = Fill(b, C.accentBg)
@@ -707,6 +741,7 @@ local function CreateSidebar()
     AddTooltip(sidebar.nav[1], L["For me"], L["Who can craft something better for you or your alts?"])
     AddTooltip(sidebar.nav[2], L["I can craft"], L["Who you can craft something better for with your professions – your alts and your guild."])
     AddTooltip(sidebar.nav[3], L["Guild & friends"], L["Everything anyone in your guild or among your friends can craft for anyone."])
+    AddTooltip(sidebar.nav[6], L["Guild stock"], L["Minimum amounts for the guild bank – what's missing, who can craft it and which mats are needed."])
     AddTooltip(sidebar.nav[5], L["Mat requests"], L["Mats your guild is looking for right now – and whether you have some."])
     AddTooltip(sidebar.nav[4], L["Buff food"], L["Who can cook the best \"Well Fed\" food in each category – Stamina, Spirit, Agility and so on."])
 
@@ -816,7 +851,19 @@ local function ShowRequestTooltip(owner, e)
     GameTooltip:Show()
 end
 
+local function ShowStockTooltip(owner, e)
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:SetHyperlink("item:" .. e.itemID)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine(string.format(L["Guild bank: %d of %d"], e.have, e.target), 1, 0.82, 0.25)
+    if e.missing > 0 then GameTooltip:AddLine(string.format(L["Missing: %d"], e.missing), 1, 0.4, 0.4) end
+    GameTooltip:AddLine(L["Craftable by: "] .. (#e.crafters > 0 and CrafterNames(e.crafters) or L["nobody known"]), 1, 1, 1, true)
+    GameTooltip:AddLine(L["Click: details · Shift-click: link"], 0.6, 0.6, 0.6)
+    GameTooltip:Show()
+end
+
 local function ShowEntryTooltip(owner, e)
+    if e.stock then return ShowStockTooltip(owner, e) end
     if e.request then return ShowRequestTooltip(owner, e) end
     if e.food then return ShowFoodTooltip(owner, e) end
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
@@ -840,6 +887,48 @@ end
 
 ns.ShowEntryTooltip = ShowEntryTooltip
 
+local function MakeEdit(parent, w, placeholder, numeric)
+    local e = CreateFrame("EditBox", nil, parent)
+    e:SetSize(w, 22)
+    e:SetAutoFocus(false)
+    e:SetFont(FONT, 11, "")
+    e:SetTextColor(C.text[1], C.text[2], C.text[3])
+    e:SetTextInsets(6, 6, 0, 0)
+    if numeric and e.SetNumeric then e:SetNumeric(true) end
+    if numeric then e:SetMaxLetters(4) end
+    Fill(e, C.bg)
+    e.border = Border(e, C.border)
+    local ph = Text(e, 10, C.muted)
+    ph:SetPoint("LEFT", 6, 0)
+    ph:SetText(placeholder or "")
+    e:SetScript("OnTextChanged", function(self) ph:SetShown((self:GetText() or "") == "") end)
+    e:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    e:SetScript("OnEditFocusGained", function(self) SetBorderColor(self.border, C.accent[1], C.accent[2], C.accent[3], 0.9) end)
+    e:SetScript("OnEditFocusLost", function(self) SetBorderColor(self.border, C.border[1], C.border[2], C.border[3], 1) end)
+    return e
+end
+
+-- Gegenstand aus Link, ID oder (zwischengespeichertem) Namen
+local function ParseItem(text)
+    text = (text or ""):match("^%s*(.-)%s*$")
+    if text == "" then return nil end
+    local id = tonumber(text:match("item:(%d+)")) or tonumber(text)
+    if id then return id end
+    local GII = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    local _, link = GII(text)
+    return link and tonumber(link:match("item:(%d+)"))
+end
+ns.ParseItem = ParseItem
+
+local activeItemBox -- bekommt Shift-Klick-Links, solange es den Fokus hat
+if hooksecurefunc and ChatEdit_InsertLink then
+    hooksecurefunc("ChatEdit_InsertLink", function(link)
+        if activeItemBox and activeItemBox:IsVisible() and activeItemBox:HasFocus() and link then
+            activeItemBox:SetText(link)
+        end
+    end)
+end
+
 local function CreateList()
     list = Panel(f, C.bg, false)
     list:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 0, 0)
@@ -855,6 +944,35 @@ local function CreateList()
     local gl = SectionLabel(list, L["GROUP BY"])
     gl:SetPoint("TOPLEFT", 12, -16)
     list.groupLabel = gl
+
+    -- Gildenlager: Ziel hinzufuegen (nur Offiziere)
+    local bar = CreateFrame("Frame", nil, list)
+    bar:SetPoint("TOPLEFT", 10, -10)
+    bar:SetPoint("TOPRIGHT", -10, -10)
+    bar:SetHeight(22)
+    local itemBox = MakeEdit(bar, 186, L["Shift-click an item or type its name"])
+    itemBox:SetPoint("LEFT")
+    itemBox:HookScript("OnEditFocusGained", function(self) activeItemBox = self end)
+    local amountBox = MakeEdit(bar, 50, L["Amount"], true)
+    amountBox:SetPoint("LEFT", itemBox, "RIGHT", 6, 0)
+    local add = MakeButton(bar, 62, 22, L["Add"], true)
+    add:SetPoint("LEFT", amountBox, "RIGHT", 6, 0)
+    local function submit()
+        local id = ParseItem(itemBox:GetText())
+        local n = tonumber(amountBox:GetText())
+        if not id then ns.Print(L["Item not found – shift-click it from your bags or a link."]); return end
+        if not n or n < 1 then ns.Print(L["Enter an amount."]); return end
+        if ns.SetTarget(id, n) then
+            itemBox:SetText(""); amountBox:SetText("")
+            itemBox:ClearFocus(); amountBox:ClearFocus()
+        end
+    end
+    add:SetScript("OnClick", submit)
+    itemBox:SetScript("OnEnterPressed", function() amountBox:SetFocus() end)
+    amountBox:SetScript("OnEnterPressed", submit)
+    AddTooltip(add, L["Add stock target"], L["Sets how many of this item should be in the guild bank. Only the guild master and officers can do this."])
+    bar:Hide()
+    list.addBar = bar
     list.seg = {}
     local modes = { { "target", L["Recipient"] }, { "crafter", L["Crafter"] } }
     for i, m in ipairs(modes) do
@@ -984,7 +1102,7 @@ end
 ---------------------------------------------------------------------------
 -- Detailbereich
 ---------------------------------------------------------------------------
-local ov, it, fd, rq -- Uebersicht / Gegenstand / Essen / Mats-Gesuch
+local ov, it, fd, rq, sk -- Uebersicht / Gegenstand / Essen / Mats-Gesuch / Gildenlager
 
 -- Zutatenliste: "4x Dunkles Leder   du 3 · Bank 6  fehlt 1"
 local function CreateMatsBlock(parent, top, title)
@@ -1184,6 +1302,10 @@ local function RenderOverview()
     if counts.help > 0 then
         add(string.format(L["You can craft %d upgrades"], counts.help), L["For your alts and your guild – click here for the list."],
             function() SetView("help") end)
+    end
+    if counts.stock > 0 then
+        add(string.format(L["Guild stock: %d items below target"], counts.stock),
+            L["The guild bank is running low – see what's missing and who can craft it."], function() SetView("stock") end)
     end
     if counts.requests > 0 then
         add(string.format(L["%d open mat requests"], counts.requests), L["Your guild is looking for mats – maybe you have some. Click here."],
@@ -1571,6 +1693,178 @@ local function RenderFood(e)
     fd.more:SetText(extra > 0 and string.format(L["+%d more"], extra) or "")
 end
 
+local function CreateStockView(parent)
+    sk = CreateFrame("Frame", nil, parent)
+    sk:SetAllPoints()
+
+    local back = CreateFrame("Button", nil, sk)
+    back:SetSize(90, 18)
+    back:SetPoint("TOPRIGHT", -14, -12)
+    local bt = Text(back, 10, C.muted, "RIGHT")
+    bt:SetPoint("RIGHT")
+    bt:SetText(L["< Overview"])
+    back:SetScript("OnEnter", function() bt:SetTextColor(1, 1, 1) end)
+    back:SetScript("OnLeave", function() bt:SetTextColor(C.muted[1], C.muted[2], C.muted[3]) end)
+    back:SetScript("OnClick", function() Select(nil) end)
+
+    local ib = CreateFrame("Button", nil, sk)
+    ib:SetSize(46, 46)
+    ib:SetPoint("TOPLEFT", 18, -34)
+    sk.icon = Icon(ib, 44)
+    sk.icon:SetPoint("CENTER")
+    sk.iconBorder = Border(ib, C.border)
+    ib:SetScript("OnEnter", function(self)
+        if selEntry then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink("item:" .. selEntry.itemID)
+            GameTooltip:Show()
+        end
+    end)
+    ib:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    sk.name = Text(sk, 15)
+    sk.name:SetPoint("TOPLEFT", ib, "TOPRIGHT", 12, -3)
+    sk.name:SetPoint("RIGHT", -18, 0)
+    sk.meta = Text(sk, 11, C.muted)
+    sk.meta:SetPoint("BOTTOMLEFT", ib, "BOTTOMRIGHT", 12, 4)
+    sk.meta:SetPoint("RIGHT", -18, 0)
+
+    -- Bestand
+    local bl = SectionLabel(sk, L["GUILD BANK"])
+    bl:SetPoint("TOPLEFT", 18, -94)
+    sk.count = Text(sk, 20, C.text)
+    sk.count:SetPoint("TOPLEFT", 18, -108)
+    sk.missing = Text(sk, 12, C.green)
+    sk.missing:SetPoint("LEFT", sk.count, "RIGHT", 12, -1)
+
+    -- Handwerker
+    local hl = SectionLabel(sk, L["CRAFTABLE BY"])
+    hl:SetPoint("TOPLEFT", 18, -146)
+    sk.crafters = {}
+    for i = 1, MAX_CRAFTER_ROWS do
+        local r = CreateFrame("Frame", nil, sk)
+        r:SetHeight(24)
+        r:SetPoint("TOPLEFT", 18, -160 - (i - 1) * 26)
+        r:SetPoint("RIGHT", -18, 0)
+        Fill(r, C.panel)
+        r.name = Text(r, 12)
+        r.name:SetPoint("LEFT", 10, 0)
+        r.sub = Text(r, 10, C.muted)
+        r.sub:SetPoint("LEFT", r.name, "RIGHT", 8, 0)
+        r.btn = MakeButton(r, 70, 18, L["Whisper"])
+        r.btn:SetPoint("RIGHT", -3, 0)
+        r.btn.label:SetFont(FONT, 10, "")
+        r.btn:SetScript("OnClick", function(self)
+            local e = selEntry
+            if not e or not self.key then return end
+            Whisper(self.key, ns.Subst(L["Hi! Our guild bank is short {n}x {item}. Could you craft some?"],
+                { n = e.missing, item = ItemLinkOrName(e.itemID) }))
+        end)
+        sk.crafters[i] = r
+    end
+    sk.nobody = Text(sk, 11, C.muted)
+    sk.nobody:SetPoint("TOPLEFT", 18, -164)
+    sk.nobody:SetText(L["Nobody known can craft this yet."])
+
+    -- Mats fuer die fehlende Menge
+    sk.mats = CreateMatsBlock(sk, -246, L["MATS FOR THE MISSING AMOUNT"])
+
+    -- Offiziere: Ziel aendern
+    sk.edit = CreateFrame("Frame", nil, sk)
+    sk.edit:SetPoint("TOPLEFT", 18, -336)
+    sk.edit:SetPoint("RIGHT", -18, 0)
+    sk.edit:SetHeight(40)
+    local el = SectionLabel(sk.edit, L["TARGET (OFFICERS)"])
+    el:SetPoint("TOPLEFT", 0, 0)
+    sk.amount = MakeEdit(sk.edit, 60, "", true)
+    sk.amount:SetPoint("TOPLEFT", 0, -14)
+    sk.save = MakeButton(sk.edit, 80, 22, L["Save"], true)
+    sk.save:SetPoint("LEFT", sk.amount, "RIGHT", 6, 0)
+    sk.remove = MakeButton(sk.edit, 80, 22, L["Remove"])
+    sk.remove:SetPoint("LEFT", sk.save, "RIGHT", 6, 0)
+    local function save()
+        local n = tonumber(sk.amount:GetText())
+        if selEntry and n and n > 0 then ns.SetTarget(selEntry.itemID, n); sk.amount:ClearFocus() end
+    end
+    sk.save:SetScript("OnClick", save)
+    sk.amount:SetScript("OnEnterPressed", save)
+    sk.remove:SetScript("OnClick", function()
+        if selEntry and ns.SetTarget(selEntry.itemID, 0) then Select(nil) end
+    end)
+
+    sk.link = MakeButton(sk, 100, 26, L["Link in chat"])
+    sk.link:SetPoint("BOTTOMLEFT", 18, 14)
+    sk.link:SetScript("OnClick", function() if selEntry then LinkInChat(selEntry.itemID) end end)
+    sk.req = MakeButton(sk, 140, 26, L["Ask for mats"], true)
+    sk.req:SetPoint("BOTTOMRIGHT", -18, 14)
+    sk.req:SetScript("OnClick", function(self) if self.run then self.run() end end)
+    AddTooltip(sk.req, L["Ask for mats"], L["Creates a mat request for what's needed to craft the missing amount."])
+end
+
+local function RenderStock(e)
+    local d = ns.ItemData(e.itemID)
+    local qr, qg, qb = QualityColor(d and d.quality)
+    sk.icon:SetTexture(d and d.icon or EMPTY_ICON)
+    SetBorderColor(sk.iconBorder, qr, qg, qb, 1)
+    sk.name:SetText(d and d.name or L["Loading item data …"])
+    sk.name:SetTextColor(qr, qg, qb)
+    local _, info = ns.StockTargets()
+    local by = info and info.by and ns.ShortName(info.by)
+    sk.meta:SetText(string.format(L["Target: %d"], e.target) .. (by and ("  ·  " .. string.format(L["set by %s"], by)) or ""))
+    sk.count:SetText(e.have .. " / " .. e.target)
+    if e.missing > 0 then
+        sk.missing:SetText("|cffff6060" .. string.format(L["%d missing"], e.missing) .. "|r")
+    else
+        sk.missing:SetText("|cff5cdb6b" .. L["target reached"] .. "|r")
+    end
+
+    for i, r in ipairs(sk.crafters) do
+        local k = e.crafters[i]
+        if k then
+            r.btn.key = k
+            r.name:SetText(CharName(k))
+            r.sub:SetText(Tag(k))
+            r.btn:SetShown(not IsMine(k) and e.missing > 0)
+            r:Show()
+        else
+            r:Hide()
+        end
+    end
+    sk.nobody:SetShown(#e.crafters == 0)
+
+    -- Mats fuer die fehlende Menge (1 Stueck pro Herstellung angenommen)
+    local base = ns.Reagents(e.itemID)
+    local scaled
+    if base and e.missing > 0 then
+        scaled = {}
+        for i, m in ipairs(base) do scaled[i] = { m[1], m[2] * e.missing } end
+    end
+    local missing
+    if e.missing == 0 then
+        for _, row in ipairs(sk.mats.rows) do row:Hide() end
+        sk.mats.empty:SetText(L["Nothing missing."])
+        sk.mats.empty:Show()
+        sk.mats.note:SetText("")
+    else
+        missing = RenderMats(sk.mats, scaled)
+    end
+
+    sk.edit:SetShown(ns.CanSetTargets())
+    if not sk.amount:HasFocus() then sk.amount:SetText(tostring(e.target)) end
+
+    sk.req.run = nil
+    if e.missing == 0 then
+        sk.req.label:SetText(L["Target reached"])
+    elseif not missing then
+        sk.req.label:SetText(L["Mats unknown"])
+    elseif #missing == 0 then
+        sk.req.label:SetText(L["Mats complete"])
+    else
+        sk.req.label:SetText(L["Ask for mats"])
+        sk.req.run = function() AskGuildForMats(e.itemID, missing) end
+    end
+    sk.req:SetActive(sk.req.run ~= nil)
+end
+
 local function CreateRequestView(parent)
     rq = CreateFrame("Frame", nil, parent)
     rq:SetAllPoints()
@@ -1655,8 +1949,11 @@ end
 
 function RenderDetail()
     if not detail then return end
-    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide()
-    if selEntry and selEntry.request then
+    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide(); sk:Hide()
+    if selEntry and selEntry.stock then
+        sk:Show()
+        RenderStock(selEntry)
+    elseif selEntry and selEntry.request then
         rq:Show()
         RenderRequest(selEntry)
     elseif selEntry and selEntry.food then
@@ -1680,6 +1977,7 @@ local function CreateDetail()
     CreateItemView(detail)
     CreateFoodView(detail)
     CreateRequestView(detail)
+    CreateStockView(detail)
 end
 
 ---------------------------------------------------------------------------
@@ -1782,6 +2080,7 @@ end
 SLASH_FRIENDSMITH1 = "/friendsmith"
 SLASH_FRIENDSMITH2 = "/fsmith"
 SlashCmdList.FRIENDSMITH = function(msg)
+    local rawMsg = msg
     msg = ((msg or ""):lower():match("^%s*(.-)%s*$")) or ""
     if msg == "sync" then
         ns.Hello(true)
@@ -1802,6 +2101,20 @@ SlashCmdList.FRIENDSMITH = function(msg)
         local show = ns.S.minimap and ns.S.minimap.hide
         ns.SetMinimapShown(show and true or false)
         ns.Print(show and L["Minimap button shown."] or L["Minimap button hidden."])
+    elseif msg == "stock" or msg == "lager" then
+        ns.OpenUI("stock")
+    elseif msg:match("^target") or msg:match("^ziel") then
+        -- /fsmith target [Item] 40   (0 = entfernen); Links behalten wir aus dem Originaltext
+        local raw = (rawMsg or ""):gsub("^%s*%S+%s*", "")
+        local amount = tonumber(raw:match("(%d+)%s*$"))
+        local id = ns.ParseItem((raw:gsub("%s*%d+%s*$", "")))
+        if id and amount then
+            if ns.SetTarget(id, amount) then
+                ns.Print(string.format(L["Stock target for %s: %d"], ItemLinkOrName(id), amount))
+            end
+        else
+            ns.Print(L["/fsmith target [item] 40 – set a stock target (0 removes it)"])
+        end
     elseif msg == "debug" then
         ns.S.debug = not ns.S.debug or nil
         ns.Print(ns.S.debug and L["Debug on: incoming Friendsmith messages are shown in chat."] or L["Debug off."])
@@ -1818,6 +2131,8 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.Print(L["/fsmith diff 3 – only count +3 or more as an upgrade"])
         ns.Print(L["/fsmith armor – allow lower armor types (on/off)"])
         ns.Print(L["/fsmith minimap – minimap button on/off"])
+        ns.Print(L["/fsmith stock – open the guild stock"])
+        ns.Print(L["/fsmith target [item] 40 – set a stock target (0 removes it)"])
         ns.Print(L["/fsmith reset – delete other guild members' data"])
     else
         ns.ToggleUI()
