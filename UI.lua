@@ -267,11 +267,15 @@ local rows, flat = {}, {}
 local offset, numRows = 0, 0
 local view, groupBy, query = "mine", "target", ""
 local selKey, selEntry
-local counts = { all = 0, mine = 0, help = 0 }
+local counts = { all = 0, mine = 0, help = 0, food = 0 }
+local foodGroups = {}
 
 local Rebuild, RenderList, RenderDetail
 
-local function EntryKey(e) return e.target .. "#" .. e.itemID end
+local function EntryKey(e)
+    if e.food then return "food#" .. e.itemID end
+    return e.target .. "#" .. e.itemID
+end
 
 local function InView(e, v)
     if v == "mine" then return IsMine(e.target) end
@@ -283,8 +287,12 @@ local function Matches(e)
     if query == "" then return true end
     local d = ns.ItemData(e.itemID)
     if d and d.name:lower():find(query, 1, true) then return true end
-    if ns.ShortName(e.target):lower():find(query, 1, true) then return true end
-    if (SLOT_NAMES[e.slot] or ""):lower():find(query, 1, true) then return true end
+    if e.food then
+        if e.label:lower():find(query, 1, true) then return true end
+    else
+        if ns.ShortName(e.target):lower():find(query, 1, true) then return true end
+        if (SLOT_NAMES[e.slot] or ""):lower():find(query, 1, true) then return true end
+    end
     for _, k in ipairs(e.crafters) do
         if ns.ShortName(k):lower():find(query, 1, true) then return true end
     end
@@ -313,10 +321,18 @@ function Rebuild()
         if InView(e, "help") then counts.help = counts.help + 1 end
         if selKey and EntryKey(e) == selKey then selEntry = e end
     end
+    foodGroups = ns.FoodList()
+    counts.food = 0
+    for _, g in ipairs(foodGroups) do
+        counts.food = counts.food + #g.items
+        for _, e in ipairs(g.items) do
+            if selKey and EntryKey(e) == selKey then selEntry = e end
+        end
+    end
     if not selEntry then selKey = nil end
 
     local groups, order = {}, {}
-    for _, e in ipairs(results) do
+    for _, e in ipairs(view ~= "food" and results or {}) do
         if InView(e, view) and Matches(e) then
             local keys
             if groupBy == "crafter" then
@@ -341,6 +357,22 @@ function Rebuild()
     table.sort(order, GroupOrder)
 
     wipe(flat)
+    if view == "food" then
+        for _, g in ipairs(foodGroups) do
+            local items = {}
+            for _, e in ipairs(g.items) do
+                if Matches(e) then items[#items + 1] = e end
+            end
+            if #items > 0 then
+                local ck = "food:" .. g.cat
+                local closed = ns.S.collapsed[ck]
+                flat[#flat + 1] = { kind = "h", food = true, label = g.label, ck = ck, n = #items, closed = closed }
+                if not closed then
+                    for _, e in ipairs(items) do flat[#flat + 1] = { kind = "i", e = e } end
+                end
+            end
+        end
+    end
     for _, k in ipairs(order) do
         local ck = groupBy .. ":" .. k
         local closed = ns.S.collapsed[ck]
@@ -359,6 +391,8 @@ function Rebuild()
     if #flat == 0 then
         if query ~= "" then
             list.empty:SetText(string.format(L["Nothing found for \"%s\"."], query))
+        elseif view == "food" then
+            list.empty:SetText(L["No buff food known yet.\n\nOpen the cooking window once on each\nof your cooks and sync with your guild."])
         elseif view == "help" then
             list.empty:SetText(L["None of your characters can craft\nanyone an upgrade right now.\n\nOpen your profession windows so your\nrecipes get recorded."])
         elseif view == "mine" then
@@ -380,7 +414,9 @@ function Rebuild()
     sidebar.diffValue:SetText("+" .. ns.S.minDiff)
 
     -- Gruppieren-Schalter
+    list.groupLabel:SetShown(view ~= "food")
     for _, sb in ipairs(list.seg) do
+        sb:SetShown(view ~= "food")
         local on = (sb.mode == groupBy)
         sb.bg:SetColorTexture(on and C.accentBtn[1] or C.panel2[1], on and C.accentBtn[2] or C.panel2[2],
             on and C.accentBtn[3] or C.panel2[3], 1)
@@ -416,9 +452,14 @@ function RenderList()
 
             if isHeader then
                 r.exp:SetTexture(it.closed and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
-                r.title:SetText(CharName(it.key))
-                local rec = Rec(it.key)
-                r.sub:SetText((rec and rec.level and (L["Level "] .. rec.level) or "") .. "  " .. Tag(it.key))
+                if it.food then
+                    r.title:SetText("|cffffd140" .. it.label .. "|r")
+                    r.sub:SetText("")
+                else
+                    r.title:SetText(CharName(it.key))
+                    local rec = Rec(it.key)
+                    r.sub:SetText((rec and rec.level and (L["Level "] .. rec.level) or "") .. "  " .. Tag(it.key))
+                end
                 r.count:SetText(it.n)
                 r.sel:Hide()
                 r.bar:Hide()
@@ -428,12 +469,17 @@ function RenderList()
                 r.icon:SetTexture(d and d.icon or EMPTY_ICON)
                 r.name:SetText(d and d.name or L["Loading …"])
                 r.name:SetTextColor(QualityColor(d and d.quality))
-                if groupBy == "crafter" then
+                if e.food then
+                    local more = #e.crafters > 1 and (" +" .. (#e.crafters - 1)) or ""
+                    r.meta:SetText(CharName(e.crafters[1]) .. more)
+                    r.gain:SetText((e.rank == 1 and "|cffffd140" or "") .. "+" .. e.amount)
+                elseif groupBy == "crafter" then
                     r.meta:SetText(CharName(e.target))
+                    r.gain:SetText(DiffText(e))
                 else
                     r.meta:SetText(SLOT_NAMES[e.slot] or "")
+                    r.gain:SetText(DiffText(e))
                 end
-                r.gain:SetText(DiffText(e))
                 local on = selKey ~= nil and EntryKey(e) == selKey
                 r.sel:SetShown(on)
                 r.bar:SetShown(on)
@@ -549,6 +595,7 @@ local NAV = {
     { view = "mine", label = L["For me"],         icon = "Interface\\Icons\\INV_Chest_Chain_05" },
     { view = "help", label = L["I can craft"], icon = "Interface\\Icons\\Trade_BlackSmithing" },
     { view = "all",  label = L["Guild & friends"],      icon = "Interface\\Icons\\INV_Misc_Book_09" },
+    { view = "food", label = L["Buff food"],      icon = "Interface\\Icons\\Spell_Misc_Food" },
 }
 
 local function CreateSidebar()
@@ -595,33 +642,34 @@ local function CreateSidebar()
     AddTooltip(sidebar.nav[1], L["For me"], L["Who can craft something better for you or your alts?"])
     AddTooltip(sidebar.nav[2], L["I can craft"], L["Who you can craft something better for with your professions – your alts and your guild."])
     AddTooltip(sidebar.nav[3], L["Guild & friends"], L["Everything anyone in your guild or among your friends can craft for anyone."])
+    AddTooltip(sidebar.nav[4], L["Buff food"], L["Who can cook the best \"Well Fed\" food in each category – Stamina, Spirit, Agility and so on."])
 
     local flbl = SectionLabel(sidebar, L["FILTER"])
-    flbl:SetPoint("TOPLEFT", 14, -142)
+    flbl:SetPoint("TOPLEFT", 14, -174)
 
     sidebar.toggles = {}
     local t1 = MakeToggle(sidebar, L["Only my crafters"],
         function() return ns.S.onlyMine end,
         function(v) ns.S.onlyMine = v; ns.MarkDirty() end)
-    t1:SetPoint("TOPLEFT", 14, -158)
+    t1:SetPoint("TOPLEFT", 14, -190)
     t1:SetPoint("RIGHT", -10, 0)
     AddTooltip(t1, L["Only my crafters"], L["Only shows upgrades you can craft with your own characters."])
     local t2 = MakeToggle(sidebar, L["Lower armor types"],
         function() return ns.S.anyArmor end,
         function(v) ns.S.anyArmor = v; ns.MarkDirty() end)
-    t2:SetPoint("TOPLEFT", 14, -206)
+    t2:SetPoint("TOPLEFT", 14, -238)
     t2:SetPoint("RIGHT", -10, 0)
     AddTooltip(t2, L["Lower armor classes"], L["E.g. also suggests leather to a warrior, not just the best armor type."])
     local t3 = MakeToggle(sidebar, L["Profession window panel"],
         function() return not ns.S.hideProfPanel end,
         function(v) ns.S.hideProfPanel = (not v) or nil; if ns.RefreshProfPanel then ns.RefreshProfPanel() end end)
-    t3:SetPoint("TOPLEFT", 14, -262)
+    t3:SetPoint("TOPLEFT", 14, -294)
     t3:SetPoint("RIGHT", -10, 0)
     AddTooltip(t3, L["Profession window panel"], L["Shows next to the profession window what you can craft with this profession, and for whom."])
     local t4 = MakeToggle(sidebar, L["Rate by spec stats"],
         function() return ns.S.useStats end,
         function(v) ns.S.useStats = v; ns.MarkDirty() end)
-    t4:SetPoint("TOPLEFT", 14, -182)
+    t4:SetPoint("TOPLEFT", 14, -214)
     t4:SetPoint("RIGHT", -10, 0)
     AddTooltip(t4, L["Rating by spec stats"],
         L["Compares strength, agility, spell power etc., weighted by specialization "] ..
@@ -630,22 +678,22 @@ local function CreateSidebar()
     local t5 = MakeToggle(sidebar, L["Minimap button"],
         function() return not (ns.S.minimap and ns.S.minimap.hide) end,
         function(v) ns.SetMinimapShown(v) end)
-    t5:SetPoint("TOPLEFT", 14, -286)
+    t5:SetPoint("TOPLEFT", 14, -318)
     t5:SetPoint("RIGHT", -10, 0)
     local t6 = MakeToggle(sidebar, L["Share with friends"],
         function() return ns.S.shareFriends end,
         function(v) ns.S.shareFriends = v; ns.MarkDirty(); if v then ns.Hello(true) end end)
-    t6:SetPoint("TOPLEFT", 14, -310)
+    t6:SetPoint("TOPLEFT", 14, -342)
     t6:SetPoint("RIGHT", -10, 0)
     AddTooltip(t6, L["Share with friends"],
         L["Also exchanges data with people on your friend list who use Friendsmith, even if they aren't in your guild. Data is only accepted from people on your own friend list."])
     sidebar.toggles = { t1, t4, t2, t3, t5, t6 }
 
     local dl = Text(sidebar, 11, C.text)
-    dl:SetPoint("TOPLEFT", 14, -236)
+    dl:SetPoint("TOPLEFT", 14, -268)
     dl:SetText(L["Min. better"])
     local plus = MakeButton(sidebar, 20, 20, "+")
-    plus:SetPoint("TOPRIGHT", -10, -232)
+    plus:SetPoint("TOPRIGHT", -10, -264)
     sidebar.diffValue = Text(sidebar, 11, C.green, "CENTER")
     sidebar.diffValue:SetWidth(30)
     sidebar.diffValue:SetPoint("RIGHT", plus, "LEFT", -2, 0)
@@ -673,7 +721,23 @@ end
 ---------------------------------------------------------------------------
 -- Liste (wie im Berufsfenster: einklappbare Gruppen)
 ---------------------------------------------------------------------------
+local function ShowFoodTooltip(owner, e)
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:SetHyperlink("item:" .. e.itemID)
+    GameTooltip:AddLine(" ")
+    if e.rank == 1 then
+        GameTooltip:AddLine(string.format(L["Best %s food you can get (+%d)"], e.label, e.amount), 1, 0.82, 0.25, true)
+    else
+        local bd = ns.ItemData(e.best.itemID)
+        GameTooltip:AddLine(string.format(L["Better: %s (+%d) by %s"], bd and bd.name or "?", e.best.amount, CrafterNames(e.best.crafters)), 1, 1, 1, true)
+    end
+    GameTooltip:AddLine(L["Cooked by: "] .. CrafterNames(e.crafters), 1, 1, 1, true)
+    GameTooltip:AddLine(L["Click: details · Shift-click: link"], 0.6, 0.6, 0.6)
+    GameTooltip:Show()
+end
+
 local function ShowEntryTooltip(owner, e)
+    if e.food then return ShowFoodTooltip(owner, e) end
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
     GameTooltip:SetHyperlink("item:" .. e.itemID)
     GameTooltip:AddLine(" ")
@@ -709,6 +773,7 @@ local function CreateList()
     -- Gruppieren
     local gl = SectionLabel(list, L["GROUP BY"])
     gl:SetPoint("TOPLEFT", 12, -16)
+    list.groupLabel = gl
     list.seg = {}
     local modes = { { "target", L["Recipient"] }, { "crafter", L["Crafter"] } }
     for i, m in ipairs(modes) do
@@ -838,7 +903,7 @@ end
 ---------------------------------------------------------------------------
 -- Detailbereich
 ---------------------------------------------------------------------------
-local ov, it -- Uebersicht / Gegenstand
+local ov, it, fd -- Uebersicht / Gegenstand / Essen
 
 local function StatCard(parent, label, icon)
     local p = Panel(parent, C.panel2)
@@ -949,7 +1014,7 @@ local function RenderOverview()
     if myRecipes == 0 then
         add(L["Record recipes"], L["Open each profession window of this character once (filters off)."])
     else
-        add(string.format(L["%d gear recipes recorded"], myRecipes), L["Learned new recipes? Just open the profession window."])
+        add(string.format(L["%d recipes recorded"], myRecipes), L["Learned new recipes? Just open the profession window."])
     end
     if ns.pending then add(L["Loading item data …"], L["Some items aren't cached yet, almost done."]) end
 
@@ -1172,14 +1237,145 @@ local function RenderItem(e)
     end
 end
 
+local function CreateFoodView(parent)
+    fd = CreateFrame("Frame", nil, parent)
+    fd:SetAllPoints()
+
+    local back = CreateFrame("Button", nil, fd)
+    back:SetSize(90, 18)
+    back:SetPoint("TOPRIGHT", -14, -12)
+    local bt = Text(back, 10, C.muted, "RIGHT")
+    bt:SetPoint("RIGHT")
+    bt:SetText(L["< Overview"])
+    back:SetScript("OnEnter", function() bt:SetTextColor(1, 1, 1) end)
+    back:SetScript("OnLeave", function() bt:SetTextColor(C.muted[1], C.muted[2], C.muted[3]) end)
+    back:SetScript("OnClick", function() Select(nil) end)
+
+    local ib = CreateFrame("Button", nil, fd)
+    ib:SetSize(46, 46)
+    ib:SetPoint("TOPLEFT", 18, -34)
+    fd.icon = Icon(ib, 44)
+    fd.icon:SetPoint("CENTER")
+    fd.iconBorder = Border(ib, C.border)
+    ib:SetScript("OnEnter", function(self)
+        if selEntry then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink("item:" .. selEntry.itemID)
+            GameTooltip:Show()
+        end
+    end)
+    ib:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ib:SetScript("OnClick", function()
+        local d = selEntry and ns.ItemData(selEntry.itemID)
+        if d and HandleModifiedItemClick then HandleModifiedItemClick(d.link) end
+    end)
+
+    fd.name = Text(fd, 15)
+    fd.name:SetPoint("TOPLEFT", ib, "TOPRIGHT", 12, -3)
+    fd.name:SetPoint("RIGHT", -18, 0)
+    fd.meta = Text(fd, 11, C.muted)
+    fd.meta:SetPoint("BOTTOMLEFT", ib, "BOTTOMRIGHT", 12, 4)
+    fd.meta:SetPoint("RIGHT", -18, 0)
+
+    local bl = SectionLabel(fd, L["WELL FED"])
+    bl:SetPoint("TOPLEFT", 18, -96)
+    local box = Panel(fd, C.panel2)
+    box:SetPoint("TOPLEFT", 18, -110)
+    box:SetPoint("RIGHT", -18, 0)
+    box:SetHeight(70)
+    fd.amount = Text(box, 20, C.green, "RIGHT")
+    fd.amount:SetPoint("TOPRIGHT", -12, -8)
+    fd.rank = Text(box, 9, C.muted, "RIGHT")
+    fd.rank:SetPoint("TOPRIGHT", fd.amount, "BOTTOMRIGHT", 0, -3)
+    fd.text = Text(box, 10, C.text)
+    fd.text:SetPoint("TOPLEFT", 10, -8)
+    fd.text:SetPoint("RIGHT", box, "RIGHT", -70, 0)
+    if fd.text.SetWordWrap then fd.text:SetWordWrap(true) end
+    if fd.text.SetMaxLines then fd.text:SetMaxLines(4) end
+
+    local cl = SectionLabel(fd, L["BEST IN CATEGORY"])
+    cl:SetPoint("TOPLEFT", 18, -194)
+    fd.best = Text(fd, 12)
+    fd.best:SetPoint("TOPLEFT", 18, -210)
+    fd.best:SetPoint("RIGHT", -18, 0)
+
+    local hl = SectionLabel(fd, L["COOKED BY"])
+    hl:SetPoint("TOPLEFT", 18, -250)
+    fd.crafters = {}
+    for i = 1, MAX_CRAFTER_ROWS do
+        local r = CreateFrame("Frame", nil, fd)
+        r:SetHeight(26)
+        r:SetPoint("TOPLEFT", 18, -264 - (i - 1) * 28)
+        r:SetPoint("RIGHT", -18, 0)
+        Fill(r, C.panel)
+        r.name = Text(r, 12)
+        r.name:SetPoint("LEFT", 10, 0)
+        r.sub = Text(r, 10, C.muted)
+        r.sub:SetPoint("LEFT", r.name, "RIGHT", 8, 0)
+        r.btn = MakeButton(r, 70, 18, L["Whisper"])
+        r.btn:SetPoint("RIGHT", -4, 0)
+        r.btn.label:SetFont(FONT, 10, "")
+        r.btn:SetScript("OnClick", function(self)
+            local e = selEntry
+            if not e or not self.key then return end
+            local d = ns.ItemData(e.itemID)
+            Whisper(self.key, ns.Subst(L["Hi! Could you cook me some {item}? I'll bring the mats."], { item = d and d.link or L["the item"] }))
+        end)
+        fd.crafters[i] = r
+    end
+    fd.more = Text(fd, 10, C.muted)
+    fd.more:SetPoint("TOPLEFT", 18, -264 - MAX_CRAFTER_ROWS * 28)
+
+    fd.link = MakeButton(fd, 150, 26, L["Link in chat"])
+    fd.link:SetPoint("BOTTOMLEFT", 18, 14)
+    fd.link:SetScript("OnClick", function() if selEntry then LinkInChat(selEntry.itemID) end end)
+end
+
+local function RenderFood(e)
+    local d = ns.ItemData(e.itemID)
+    local qr, qg, qb = QualityColor(d and d.quality)
+    fd.icon:SetTexture(d and d.icon or EMPTY_ICON)
+    SetBorderColor(fd.iconBorder, qr, qg, qb, 1)
+    fd.name:SetText(d and d.name or L["Loading item data …"])
+    fd.name:SetTextColor(qr, qg, qb)
+    local meta = { e.label }
+    if e.req and e.req > 1 then meta[#meta + 1] = L["requires level "] .. e.req end
+    fd.meta:SetText(table.concat(meta, "  ·  "))
+    fd.text:SetText(e.text or "")
+    fd.amount:SetText("+" .. e.amount)
+    fd.rank:SetText(e.rank == 1 and L["BEST"] or string.format(L["RANK %d"], e.rank))
+    if e.rank == 1 then
+        fd.best:SetText("|cffffd140" .. L["This is the best food in this category."] .. "|r")
+    else
+        local bd = ns.ItemData(e.best.itemID)
+        fd.best:SetText((bd and bd.name or "?") .. "  |cff5cdb6b+" .. e.best.amount .. "|r  ·  " .. CrafterNames(e.best.crafters))
+    end
+    for i, r in ipairs(fd.crafters) do
+        local k = e.crafters[i]
+        if k then
+            r.btn.key = k
+            r.name:SetText(CharName(k))
+            r.sub:SetText(Tag(k))
+            r.btn:SetShown(not IsMine(k))
+            r:Show()
+        else
+            r:Hide()
+        end
+    end
+    local extra = #e.crafters - MAX_CRAFTER_ROWS
+    fd.more:SetText(extra > 0 and string.format(L["+%d more"], extra) or "")
+end
+
 function RenderDetail()
     if not detail then return end
-    if selEntry then
-        ov:Hide()
+    ov:Hide(); it:Hide(); fd:Hide()
+    if selEntry and selEntry.food then
+        fd:Show()
+        RenderFood(selEntry)
+    elseif selEntry then
         it:Show()
         RenderItem(selEntry)
     else
-        it:Hide()
         ov:Show()
         RenderOverview()
     end
@@ -1192,6 +1388,7 @@ local function CreateDetail()
     Fill(detail, C.panel)
     CreateOverview(detail)
     CreateItemView(detail)
+    CreateFoodView(detail)
 end
 
 ---------------------------------------------------------------------------
@@ -1261,7 +1458,7 @@ local function AddTooltipLines(tt, itemID)
     ns.GetResults()
     local who = ns.craftable and ns.craftable[itemID]
     if not who then return end
-    tt:AddLine("Friendsmith – craftbar von: " .. CrafterNames(who), 0.95, 0.6, 0.3, true)
+    tt:AddLine(L["Friendsmith – craftable by: "] .. CrafterNames(who), 0.95, 0.6, 0.3, true)
     local ups = ns.byItem and ns.byItem[itemID]
     if ups then
         local t = {}

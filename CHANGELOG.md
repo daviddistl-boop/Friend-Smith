@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+- **Buff food:** new view that shows who can cook the best "Well Fed" food in each category
+  (Stamina & Spirit, Agility, Strength, Intellect, Mana regeneration …) – across your alts, guild and friends.
+  The best food of each category is highlighted; the detail pane shows the buff, all cooks and a whisper button.
+- Cooking recipes are now recorded when you open the cooking window and shared like gear recipes.
+  Older Friendsmith versions simply ignore them.
+- Item tooltips now also show who can cook a food.
+
 ## 0.5.0
 - **Friends:** Friendsmith now also syncs with people on your friend list who use it, even if they're not in your guild.
   Data is exchanged automatically when you or a friend logs in, and only accepted from people on your own friend list.

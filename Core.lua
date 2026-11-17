@@ -233,24 +233,26 @@ end
 ---------------------------------------------------------------------------
 local MAX_PER_SLOT = 3
 
+-- Zaehlt ein Charakter mit? Eigene immer, sonst Gilde oder (wenn erlaubt) Freunde mit frischen Daten.
+function ns.IsRelevant(rec, myGuild, now)
+    if rec.mine then return true end
+    if (now - (rec.updated or 0)) >= ns.S.maxAgeDays * 86400 then return false end
+    if myGuild ~= nil and rec.guild == myGuild then return true end
+    return rec.friend and ns.S.shareFriends or false
+end
+
 function ns.Compute()
     ns.pending = false
     local DB = FriendsmithDB
     local myGuild = GetGuildInfo("player")
     local now = time()
-    local maxAge = ns.S.maxAgeDays * 86400
-
-    local function relevant(rec)
-        if rec.mine then return true end
-        if (now - (rec.updated or 0)) >= maxAge then return false end
-        if myGuild ~= nil and rec.guild == myGuild then return true end
-        return rec.friend and ns.S.shareFriends or false
-    end
+    local function relevant(rec) return ns.IsRelevant(rec, myGuild, now) end
 
     local targets, crafters = {}, {}
     for key, rec in pairs(DB.chars) do
         if relevant(rec) then
             if rec.gear and rec.class then targets[#targets + 1] = key end
+            -- (Kochrezepte stecken mit in rec.recipes; Evaluate ignoriert alles, was nicht anlegbar ist)
             if rec.recipes and next(rec.recipes) and (not ns.S.onlyMine or rec.mine) then
                 crafters[#crafters + 1] = key
             end
@@ -380,8 +382,34 @@ local function IsGear(itemID)
     return equipLoc and INVTYPE_SLOTS[equipLoc] ~= nil
 end
 
-local function AddRecipe(rec, itemID)
-    if itemID and IsGear(itemID) and not rec.recipes[itemID] then
+-- Ist gerade das Kochen-Fenster offen? (Fertigkeitslinie 185 bzw. Name des Zaubers "Kochkunst")
+local function IsCookingWindow()
+    local cook = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(2550)) or (GetSpellInfo and GetSpellInfo(2550))
+    local T = C_TradeSkillUI
+    if T and T.GetBaseProfessionInfo then
+        local ok, info = pcall(T.GetBaseProfessionInfo)
+        if ok and type(info) == "table" and (info.professionID == 185 or (cook and info.professionName == cook)) then return true end
+    end
+    if T and T.GetTradeSkillLine then
+        local ok, id, name = pcall(T.GetTradeSkillLine)
+        if ok and (id == 185 or (cook and (name == cook or id == cook))) then return true end
+    end
+    if GetTradeSkillLine then
+        local name = GetTradeSkillLine()
+        if cook and name == cook then return true end
+    end
+    return false
+end
+ns.IsCookingWindow = IsCookingWindow
+
+-- Gekochtes Essen (Verbrauchsgut) merken wir uns fuer die Buff-Essen-Ansicht
+local function IsFood(itemID)
+    local _, _, _, equipLoc, _, classID = GetItemInfoInstant(itemID)
+    return classID == 0 and (not equipLoc or equipLoc == "")
+end
+
+local function AddRecipe(rec, itemID, cooking)
+    if itemID and (IsGear(itemID) or (cooking and IsFood(itemID))) and not rec.recipes[itemID] then
         rec.recipes[itemID] = true
         return 1
     end
@@ -442,8 +470,9 @@ function ns.ScanRecipes(verbose)
 
     local map = ns.CurrentRecipes()
     if not map then return end
+    local cooking = IsCookingWindow()
     for itemID in pairs(map) do
-        added = added + AddRecipe(rec, itemID)
+        added = added + AddRecipe(rec, itemID, cooking)
     end
 
     if added > 0 then
@@ -455,7 +484,7 @@ function ns.ScanRecipes(verbose)
     if verbose or added > 0 then
         local total = 0
         for _ in pairs(rec.recipes) do total = total + 1 end
-        ns.Print(string.format(L["%d new gear recipes recorded (total %d)."], added, total))
+        ns.Print(string.format(L["%d new recipes recorded (total %d)."], added, total))
     end
 end
 

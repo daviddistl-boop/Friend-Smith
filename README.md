@@ -17,6 +17,7 @@ Languages: English and German (follows your game client).
   - **For me** – who can craft something better for you or your alts?
   - **I can craft** – who can you craft something better for with your professions (your alts, guild and friends)?
   - **Guild & friends** – everything at a glance.
+  - **Buff food** – who can cook the best "Well Fed" food in each category (Stamina & Spirit, Agility, Strength, Intellect, Mana regeneration …), best first.
 
   The list is grouped by character (or by crafter) and collapsible, just like the profession window.
   The detail pane compares the item with what the character is wearing and has buttons to whisper a request or an offer – the item link is already filled in.
@@ -43,7 +44,7 @@ Languages: English and German (follows your game client).
 
 ## Getting started
 1. Log in once on **every** character – their gear is saved automatically.
-2. On each crafter, open **every profession window** once. Expand all categories and turn off
+2. On each crafter, open **every profession window** once (including Cooking for the buff food list). Expand all categories and turn off
    filters like "Have Materials" so all recipes get recorded.
 3. Ask your guild and friends to install Friendsmith. Everyone syncs automatically on login;
    you can also click *Sync* or type `/fsmith sync`.
