@@ -7,6 +7,7 @@ local L = ns.L
 
 local PREFIX = "FSMITH1"
 local PROTO  = "1"
+ns.PROTO = PROTO
 local CHUNK  = 200
 local FRIEND_HELLO_COOLDOWN = 600 -- pro Freund hoechstens alle 10 Minuten automatisch austauschen
 local SendAddon      = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
@@ -57,6 +58,8 @@ function ns.FriendList()
     return set
 end
 
+ns.NormalizeName = Normalize
+
 local function IsFriend(sender)
     local key = Normalize(sender)
     return key ~= nil and ns.FriendList()[key] ~= nil
@@ -77,6 +80,8 @@ local function Enqueue(payload, channel, target)
         }
     end
 end
+
+ns.Enqueue = Enqueue
 
 local function CleanBuffers()
     local now = GetTime()
@@ -119,6 +124,9 @@ local function SendCharTo(key, what, channel, target)
         if #ids > 0 then
             Enqueue(table.concat({ PROTO, "R", key, table.concat(ids, ",") }, ";"), channel, target)
         end
+        -- Zutaten der Rezepte (aeltere Versionen ignorieren "M")
+        local mats = ns.ReagentPayload and ns.ReagentPayload(rec)
+        if mats then Enqueue(table.concat({ PROTO, "M", key, mats }, ";"), channel, target) end
     end
 end
 
@@ -150,6 +158,7 @@ function ns.BroadcastAll()
     for key, rec in pairs(FriendsmithDB.chars) do
         if rec.mine and rec.guild == myGuild then SendCharTo(key, nil, "GUILD") end
     end
+    if ns.BroadcastExtra then ns.BroadcastExtra() end
 end
 
 -- Alle eigenen Charaktere an einen Freund.
@@ -202,6 +211,9 @@ function ns.HandlePayload(sender, payload, channel)
         end
         return
     end
+
+    -- Zutaten, Gildenbank, Mats-Gesuche (Mats.lua)
+    if ns.HandleExtra and ns.HandleExtra(kind, f, sender, channel) then return end
 
     local key = f[3]
     if not key or key == "" then return end

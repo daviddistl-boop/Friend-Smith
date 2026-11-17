@@ -28,7 +28,8 @@ local C = {
 local W, H = 880, 560
 local HEADER_H, STATUS_H, SIDEBAR_W, LIST_W = 48, 22, 184, 330
 local ROW_H = 22
-local MAX_CRAFTER_ROWS = 5
+local MAX_CRAFTER_ROWS = 3
+local MAX_MAT_ROWS = 5
 
 local SLOT_NAMES = {
     [1] = L["Head"], [2] = L["Neck"], [3] = L["Shoulder"], [5] = L["Chest"], [6] = L["Waist"],
@@ -228,6 +229,18 @@ local function Whisper(key, msg)
     OpenChat("/w " .. WhisperName(key) .. " " .. (msg or ""))
 end
 
+local function AgeText(t)
+    local s = math.max(0, time() - (t or 0))
+    if s < 3600 then return string.format(L["%d min"], math.max(1, math.floor(s / 60))) end
+    if s < 86400 then return string.format(L["%d h"], math.floor(s / 3600)) end
+    return string.format(L["%d d"], math.floor(s / 86400))
+end
+
+local function ItemLinkOrName(id)
+    local d = ns.ItemData(id)
+    return d and d.link or (d and d.name) or ("item " .. id)
+end
+
 local function LinkInChat(itemID)
     local d = ns.ItemData(itemID)
     if not d then return end
@@ -267,13 +280,15 @@ local rows, flat = {}, {}
 local offset, numRows = 0, 0
 local view, groupBy, query = "mine", "target", ""
 local selKey, selEntry
-local counts = { all = 0, mine = 0, help = 0, food = 0 }
+local counts = { all = 0, mine = 0, help = 0, food = 0, requests = 0 }
+local reqEntries = {}
 local foodGroups = {}
 
 local Rebuild, RenderList, RenderDetail
 
 local function EntryKey(e)
     if e.food then return "food#" .. e.itemID end
+    if e.request then return "req#" .. e.r.id end
     return e.target .. "#" .. e.itemID
 end
 
@@ -287,7 +302,13 @@ local function Matches(e)
     if query == "" then return true end
     local d = ns.ItemData(e.itemID)
     if d and d.name:lower():find(query, 1, true) then return true end
-    if e.food then
+    if e.request then
+        if ns.ShortName(e.r.from):lower():find(query, 1, true) then return true end
+        for _, m in ipairs(e.r.mats) do
+            local md = ns.ItemData(m[1])
+            if md and md.name:lower():find(query, 1, true) then return true end
+        end
+    elseif e.food then
         if e.label:lower():find(query, 1, true) then return true end
     else
         if ns.ShortName(e.target):lower():find(query, 1, true) then return true end
@@ -329,10 +350,18 @@ function Rebuild()
             if selKey and EntryKey(e) == selKey then selEntry = e end
         end
     end
+    wipe(reqEntries)
+    for _, r in ipairs(ns.OpenRequests()) do
+        local e = { request = true, r = r, itemID = r.item, crafters = {} }
+        reqEntries[#reqEntries + 1] = e
+        if selKey and EntryKey(e) == selKey then selEntry = e end
+    end
+    counts.requests = #reqEntries
     if not selEntry then selKey = nil end
 
     local groups, order = {}, {}
-    for _, e in ipairs(view ~= "food" and results or {}) do
+    local grouped = view ~= "food" and view ~= "requests"
+    for _, e in ipairs(grouped and results or {}) do
         if InView(e, view) and Matches(e) then
             local keys
             if groupBy == "crafter" then
@@ -356,6 +385,17 @@ function Rebuild()
     end
     table.sort(order, GroupOrder)
 
+    if view == "requests" then
+        for _, e in ipairs(reqEntries) do
+            if Matches(e) then
+                local k = e.r.from
+                if not groups[k] then groups[k] = {}; order[#order + 1] = k end
+                table.insert(groups[k], e)
+            end
+        end
+        table.sort(order, GroupOrder)
+    end
+
     wipe(flat)
     if view == "food" then
         for _, g in ipairs(foodGroups) do
@@ -374,7 +414,7 @@ function Rebuild()
         end
     end
     for _, k in ipairs(order) do
-        local ck = groupBy .. ":" .. k
+        local ck = (view == "requests" and "req" or groupBy) .. ":" .. k
         local closed = ns.S.collapsed[ck]
         flat[#flat + 1] = { kind = "h", key = k, ck = ck, n = #groups[k], closed = closed }
         if not closed then
@@ -391,6 +431,8 @@ function Rebuild()
     if #flat == 0 then
         if query ~= "" then
             list.empty:SetText(string.format(L["Nothing found for \"%s\"."], query))
+        elseif view == "requests" then
+            list.empty:SetText(L["No open mat requests in your guild.\n\nIn the details of an upgrade you can\nask your guild for missing mats."])
         elseif view == "food" then
             list.empty:SetText(L["No buff food known yet.\n\nOpen the cooking window once on each\nof your cooks and sync with your guild."])
         elseif view == "help" then
@@ -414,9 +456,9 @@ function Rebuild()
     sidebar.diffValue:SetText("+" .. ns.S.minDiff)
 
     -- Gruppieren-Schalter
-    list.groupLabel:SetShown(view ~= "food")
+    list.groupLabel:SetShown(grouped)
     for _, sb in ipairs(list.seg) do
-        sb:SetShown(view ~= "food")
+        sb:SetShown(grouped)
         local on = (sb.mode == groupBy)
         sb.bg:SetColorTexture(on and C.accentBtn[1] or C.panel2[1], on and C.accentBtn[2] or C.panel2[2],
             on and C.accentBtn[3] or C.panel2[3], 1)
@@ -469,7 +511,14 @@ function RenderList()
                 r.icon:SetTexture(d and d.icon or EMPTY_ICON)
                 r.name:SetText(d and d.name or L["Loading …"])
                 r.name:SetTextColor(QualityColor(d and d.quality))
-                if e.food then
+                if e.request then
+                    local help = false
+                    if not IsMine(e.r.from) then
+                        for _, m in ipairs(e.r.mats) do if ns.OwnCount(m[1]) > 0 then help = true end end
+                    end
+                    r.meta:SetText(help and ("|cff5cdb6b" .. L["you have some"] .. "|r") or string.format(L["%d mats"], #e.r.mats))
+                    r.gain:SetText("|cff8f96a8" .. AgeText(e.r.t) .. "|r")
+                elseif e.food then
                     local more = #e.crafters > 1 and (" +" .. (#e.crafters - 1)) or ""
                     r.meta:SetText(CharName(e.crafters[1]) .. more)
                     r.gain:SetText((e.rank == 1 and "|cffffd140" or "") .. "+" .. e.amount)
@@ -596,6 +645,7 @@ local NAV = {
     { view = "help", label = L["I can craft"], icon = "Interface\\Icons\\Trade_BlackSmithing" },
     { view = "all",  label = L["Guild & friends"],      icon = "Interface\\Icons\\INV_Misc_Book_09" },
     { view = "food", label = L["Buff food"],      icon = "Interface\\Icons\\Spell_Misc_Food" },
+    { view = "requests", label = L["Mat requests"], icon = "Interface\\Icons\\INV_Misc_Bag_10" },
 }
 
 local function CreateSidebar()
@@ -642,34 +692,35 @@ local function CreateSidebar()
     AddTooltip(sidebar.nav[1], L["For me"], L["Who can craft something better for you or your alts?"])
     AddTooltip(sidebar.nav[2], L["I can craft"], L["Who you can craft something better for with your professions – your alts and your guild."])
     AddTooltip(sidebar.nav[3], L["Guild & friends"], L["Everything anyone in your guild or among your friends can craft for anyone."])
+    AddTooltip(sidebar.nav[5], L["Mat requests"], L["Mats your guild is looking for right now – and whether you have some."])
     AddTooltip(sidebar.nav[4], L["Buff food"], L["Who can cook the best \"Well Fed\" food in each category – Stamina, Spirit, Agility and so on."])
 
     local flbl = SectionLabel(sidebar, L["FILTER"])
-    flbl:SetPoint("TOPLEFT", 14, -174)
+    flbl:SetPoint("TOPLEFT", 14, -206)
 
     sidebar.toggles = {}
     local t1 = MakeToggle(sidebar, L["Only my crafters"],
         function() return ns.S.onlyMine end,
         function(v) ns.S.onlyMine = v; ns.MarkDirty() end)
-    t1:SetPoint("TOPLEFT", 14, -190)
+    t1:SetPoint("TOPLEFT", 14, -222)
     t1:SetPoint("RIGHT", -10, 0)
     AddTooltip(t1, L["Only my crafters"], L["Only shows upgrades you can craft with your own characters."])
     local t2 = MakeToggle(sidebar, L["Lower armor types"],
         function() return ns.S.anyArmor end,
         function(v) ns.S.anyArmor = v; ns.MarkDirty() end)
-    t2:SetPoint("TOPLEFT", 14, -238)
+    t2:SetPoint("TOPLEFT", 14, -270)
     t2:SetPoint("RIGHT", -10, 0)
     AddTooltip(t2, L["Lower armor classes"], L["E.g. also suggests leather to a warrior, not just the best armor type."])
     local t3 = MakeToggle(sidebar, L["Profession window panel"],
         function() return not ns.S.hideProfPanel end,
         function(v) ns.S.hideProfPanel = (not v) or nil; if ns.RefreshProfPanel then ns.RefreshProfPanel() end end)
-    t3:SetPoint("TOPLEFT", 14, -294)
+    t3:SetPoint("TOPLEFT", 14, -326)
     t3:SetPoint("RIGHT", -10, 0)
     AddTooltip(t3, L["Profession window panel"], L["Shows next to the profession window what you can craft with this profession, and for whom."])
     local t4 = MakeToggle(sidebar, L["Rate by spec stats"],
         function() return ns.S.useStats end,
         function(v) ns.S.useStats = v; ns.MarkDirty() end)
-    t4:SetPoint("TOPLEFT", 14, -214)
+    t4:SetPoint("TOPLEFT", 14, -246)
     t4:SetPoint("RIGHT", -10, 0)
     AddTooltip(t4, L["Rating by spec stats"],
         L["Compares strength, agility, spell power etc., weighted by specialization "] ..
@@ -678,22 +729,22 @@ local function CreateSidebar()
     local t5 = MakeToggle(sidebar, L["Minimap button"],
         function() return not (ns.S.minimap and ns.S.minimap.hide) end,
         function(v) ns.SetMinimapShown(v) end)
-    t5:SetPoint("TOPLEFT", 14, -318)
+    t5:SetPoint("TOPLEFT", 14, -350)
     t5:SetPoint("RIGHT", -10, 0)
     local t6 = MakeToggle(sidebar, L["Share with friends"],
         function() return ns.S.shareFriends end,
         function(v) ns.S.shareFriends = v; ns.MarkDirty(); if v then ns.Hello(true) end end)
-    t6:SetPoint("TOPLEFT", 14, -342)
+    t6:SetPoint("TOPLEFT", 14, -374)
     t6:SetPoint("RIGHT", -10, 0)
     AddTooltip(t6, L["Share with friends"],
         L["Also exchanges data with people on your friend list who use Friendsmith, even if they aren't in your guild. Data is only accepted from people on your own friend list."])
     sidebar.toggles = { t1, t4, t2, t3, t5, t6 }
 
     local dl = Text(sidebar, 11, C.text)
-    dl:SetPoint("TOPLEFT", 14, -268)
+    dl:SetPoint("TOPLEFT", 14, -300)
     dl:SetText(L["Min. better"])
     local plus = MakeButton(sidebar, 20, 20, "+")
-    plus:SetPoint("TOPRIGHT", -10, -264)
+    plus:SetPoint("TOPRIGHT", -10, -296)
     sidebar.diffValue = Text(sidebar, 11, C.green, "CENTER")
     sidebar.diffValue:SetWidth(30)
     sidebar.diffValue:SetPoint("RIGHT", plus, "LEFT", -2, 0)
@@ -736,7 +787,22 @@ local function ShowFoodTooltip(owner, e)
     GameTooltip:Show()
 end
 
+local function ShowRequestTooltip(owner, e)
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:SetHyperlink("item:" .. e.itemID)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine(string.format(L["%s is looking for mats (%s ago):"], CharName(e.r.from), AgeText(e.r.t)), 1, 0.82, 0.25, true)
+    for _, m in ipairs(e.r.mats) do
+        local md = ns.ItemData(m[1])
+        local own = ns.OwnCount(m[1])
+        GameTooltip:AddLine(m[2] .. "x " .. (md and md.name or "…") .. (own > 0 and ("  |cff5cdb6b" .. string.format(L["(you have %d)"], own) .. "|r") or ""), 1, 1, 1)
+    end
+    GameTooltip:AddLine(L["Click: details · Shift-click: link"], 0.6, 0.6, 0.6)
+    GameTooltip:Show()
+end
+
 local function ShowEntryTooltip(owner, e)
+    if e.request then return ShowRequestTooltip(owner, e) end
     if e.food then return ShowFoodTooltip(owner, e) end
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
     GameTooltip:SetHyperlink("item:" .. e.itemID)
@@ -903,7 +969,106 @@ end
 ---------------------------------------------------------------------------
 -- Detailbereich
 ---------------------------------------------------------------------------
-local ov, it, fd -- Uebersicht / Gegenstand / Essen
+local ov, it, fd, rq -- Uebersicht / Gegenstand / Essen / Mats-Gesuch
+
+-- Zutatenliste: "4x Dunkles Leder   du 3 · Bank 6  fehlt 1"
+local function CreateMatsBlock(parent, top, title)
+    local b = { rows = {} }
+    b.label = SectionLabel(parent, title)
+    b.label:SetPoint("TOPLEFT", 18, top)
+    b.note = Text(parent, 9, C.muted, "RIGHT")
+    b.note:SetPoint("TOPRIGHT", -18, top)
+    for i = 1, MAX_MAT_ROWS do
+        local r = CreateFrame("Button", nil, parent)
+        r:SetHeight(14)
+        r:SetPoint("TOPLEFT", 18, top - 14 - (i - 1) * 14)
+        r:SetPoint("RIGHT", -18, 0)
+        local hl = r:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetColorTexture(1, 1, 1, 0.05)
+        r.icon = Icon(r, 12)
+        r.icon:SetPoint("LEFT", 2, 0)
+        r.state = r:CreateTexture(nil, "ARTWORK")
+        r.state:SetSize(12, 12)
+        r.state:SetPoint("RIGHT", -2, 0)
+        r.info = Text(r, 10, C.muted, "RIGHT")
+        r.info:SetPoint("RIGHT", r.state, "LEFT", -4, 0)
+        r.name = Text(r, 10)
+        r.name:SetPoint("LEFT", r.icon, "RIGHT", 5, 0)
+        r.name:SetPoint("RIGHT", r.info, "LEFT", -6, 0)
+        r:SetScript("OnEnter", function(self)
+            if not self.id then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink("item:" .. self.id)
+            GameTooltip:Show()
+        end)
+        r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        r:SetScript("OnClick", function(self) if self.id and IsShiftKeyDown() then LinkInChat(self.id) end end)
+        b.rows[i] = r
+    end
+    b.empty = Text(parent, 10, C.muted)
+    b.empty:SetPoint("TOPLEFT", 18, top - 16)
+    b.empty:SetPoint("RIGHT", -18, 0)
+    if b.empty.SetWordWrap then b.empty:SetWordWrap(true) end
+    return b
+end
+
+-- Zeigt die Zutaten und gibt zurueck, was fehlt ({ {id, anzahl}, ... }); nil = Zutaten unbekannt
+local function RenderMats(b, mats)
+    local bt = ns.GuildBankTime()
+    if bt then
+        b.note:SetText(string.format(L["guild bank: %s ago"], AgeText(bt)))
+    else
+        b.note:SetText(IsInGuild() and L["guild bank not seen yet"] or "")
+    end
+    if not mats then
+        for _, r in ipairs(b.rows) do r:Hide() end
+        b.empty:SetText(L["Mats unknown – the crafter needs Friendsmith 0.7 or newer and has to open the profession window once."])
+        b.empty:Show()
+        return nil
+    end
+    b.empty:Hide()
+    local missing = {}
+    for i, m in ipairs(mats) do
+        local id, need = m[1], m[2]
+        local own, bank = ns.OwnCount(id), ns.GuildBankCount(id)
+        local miss = math.max(0, need - own - bank)
+        if miss > 0 then missing[#missing + 1] = { id, miss } end
+        local r = b.rows[i]
+        if r then
+            local d = ns.ItemData(id)
+            r.id = id
+            r.icon:SetTexture(d and d.icon or EMPTY_ICON)
+            r.name:SetText(need .. "x " .. (d and d.name or "…"))
+            r.name:SetTextColor(QualityColor(d and d.quality))
+            local info = string.format(L["you %d · bank %d"], own, bank)
+            if miss > 0 then info = info .. "  |cffff6060" .. string.format(L["missing %d"], miss) .. "|r" end
+            r.info:SetText(info)
+            r.state:SetTexture(miss > 0 and "Interface\\RaidFrame\\ReadyCheck-NotReady" or "Interface\\RaidFrame\\ReadyCheck-Ready")
+            r:Show()
+        end
+    end
+    for i = #mats + 1, #b.rows do b.rows[i]:Hide() end
+    return missing
+end
+
+-- Gesuch anlegen (fuer alle mit Friendsmith sichtbar) und Text fuer den Gildenchat vorbereiten
+local function AskGuildForMats(itemID, missing)
+    ns.CreateRequest(itemID, missing)
+    local function build(withLinks)
+        local parts = {}
+        for _, m in ipairs(missing) do
+            local d = ns.ItemData(m[1])
+            parts[#parts + 1] = m[2] .. "x " .. ((withLinks and d and d.link) or (d and d.name) or "?")
+        end
+        return ns.Subst(L["Looking for mats for {item}: {mats} – can anyone help?"],
+            { item = ItemLinkOrName(itemID), mats = table.concat(parts, ", ") })
+    end
+    local msg = build(true)
+    if #msg > 250 then msg = build(false) end
+    OpenChat("/g " .. msg)
+    ns.Print(L["Mat request saved – your guild sees it in Friendsmith under \"Mat requests\". Press Enter to also post it in guild chat."])
+end
 
 local function StatCard(parent, label, icon)
     local p = Panel(parent, C.panel2)
@@ -1004,6 +1169,10 @@ local function RenderOverview()
     if counts.help > 0 then
         add(string.format(L["You can craft %d upgrades"], counts.help), L["For your alts and your guild – click here for the list."],
             function() SetView("help") end)
+    end
+    if counts.requests > 0 then
+        add(string.format(L["%d open mat requests"], counts.requests), L["Your guild is looking for mats – maybe you have some. Click here."],
+            function() SetView("requests") end)
     end
     if not IsInGuild() then
         add(L["No guild"], L["Without a guild, only your own characters and friends using Friendsmith are compared."])
@@ -1145,13 +1314,21 @@ local function CreateItemView(parent)
     it.more = Text(it, 10, C.muted)
     it.more:SetPoint("TOPLEFT", 18, -264 - MAX_CRAFTER_ROWS * 28)
 
+    -- Zutaten
+    it.mats = CreateMatsBlock(it, -362, L["MATS"])
+
     -- Aktionen
-    it.link = MakeButton(it, 150, 26, L["Link in chat"])
+    it.link = MakeButton(it, 100, 26, L["Link in chat"])
     it.link:SetPoint("BOTTOMLEFT", 18, 14)
     it.link:SetScript("OnClick", function() if selEntry then LinkInChat(selEntry.itemID) end end)
-    it.ask = MakeButton(it, 150, 26, L["Whisper request"], true)
+    it.ask = MakeButton(it, 108, 26, L["Whisper request"], true)
     it.ask:SetPoint("BOTTOMRIGHT", -18, 14)
     it.ask:SetScript("OnClick", function(self) if self.run then self.run() end end)
+    it.req = MakeButton(it, 108, 26, L["Ask for mats"])
+    it.req:SetPoint("RIGHT", it.ask, "LEFT", -6, 0)
+    it.req:SetScript("OnClick", function(self) if self.run then self.run() end end)
+    AddTooltip(it.req, L["Ask for mats"],
+        L["Saves a mat request that everyone in your guild with Friendsmith sees, and prepares a guild chat message with the missing mats."])
 end
 
 local function RenderItem(e)
@@ -1235,6 +1412,19 @@ local function RenderItem(e)
         it.ask.run = nil
         it.ask:SetActive(false)
     end
+
+    -- Zutaten und Mats-Anfrage
+    local missing = RenderMats(it.mats, ns.Reagents(e.itemID))
+    it.req.run = nil
+    if not missing then
+        it.req.label:SetText(L["Mats unknown"])
+    elseif #missing == 0 then
+        it.req.label:SetText(L["Mats complete"])
+    else
+        it.req.label:SetText(L["Ask for mats"])
+        if IsInGuild() then it.req.run = function() AskGuildForMats(e.itemID, missing) end end
+    end
+    it.req:SetActive(it.req.run ~= nil)
 end
 
 local function CreateFoodView(parent)
@@ -1366,10 +1556,95 @@ local function RenderFood(e)
     fd.more:SetText(extra > 0 and string.format(L["+%d more"], extra) or "")
 end
 
+local function CreateRequestView(parent)
+    rq = CreateFrame("Frame", nil, parent)
+    rq:SetAllPoints()
+
+    local back = CreateFrame("Button", nil, rq)
+    back:SetSize(90, 18)
+    back:SetPoint("TOPRIGHT", -14, -12)
+    local bt = Text(back, 10, C.muted, "RIGHT")
+    bt:SetPoint("RIGHT")
+    bt:SetText(L["< Overview"])
+    back:SetScript("OnEnter", function() bt:SetTextColor(1, 1, 1) end)
+    back:SetScript("OnLeave", function() bt:SetTextColor(C.muted[1], C.muted[2], C.muted[3]) end)
+    back:SetScript("OnClick", function() Select(nil) end)
+
+    local ib = CreateFrame("Button", nil, rq)
+    ib:SetSize(46, 46)
+    ib:SetPoint("TOPLEFT", 18, -34)
+    rq.icon = Icon(ib, 44)
+    rq.icon:SetPoint("CENTER")
+    rq.iconBorder = Border(ib, C.border)
+    ib:SetScript("OnEnter", function(self)
+        if selEntry then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink("item:" .. selEntry.itemID)
+            GameTooltip:Show()
+        end
+    end)
+    ib:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    rq.name = Text(rq, 15)
+    rq.name:SetPoint("TOPLEFT", ib, "TOPRIGHT", 12, -3)
+    rq.name:SetPoint("RIGHT", -18, 0)
+    rq.meta = Text(rq, 11, C.muted)
+    rq.meta:SetPoint("BOTTOMLEFT", ib, "BOTTOMRIGHT", 12, 4)
+    rq.meta:SetPoint("RIGHT", -18, 0)
+
+    rq.mats = CreateMatsBlock(rq, -96, L["MATS NEEDED"])
+    rq.hint = Text(rq, 11, C.text)
+    rq.hint:SetPoint("TOPLEFT", 18, -200)
+    rq.hint:SetPoint("RIGHT", -18, 0)
+    if rq.hint.SetWordWrap then rq.hint:SetWordWrap(true) end
+
+    rq.link = MakeButton(rq, 100, 26, L["Link in chat"])
+    rq.link:SetPoint("BOTTOMLEFT", 18, 14)
+    rq.link:SetScript("OnClick", function() if selEntry then LinkInChat(selEntry.itemID) end end)
+    rq.act = MakeButton(rq, 150, 26, L["Whisper: I can help"], true)
+    rq.act:SetPoint("BOTTOMRIGHT", -18, 14)
+    rq.act:SetScript("OnClick", function(self) if self.run then self.run() end end)
+end
+
+local function RenderRequest(e)
+    local r = e.r
+    local d = ns.ItemData(r.item)
+    local qr, qg, qb = QualityColor(d and d.quality)
+    rq.icon:SetTexture(d and d.icon or EMPTY_ICON)
+    SetBorderColor(rq.iconBorder, qr, qg, qb, 1)
+    rq.name:SetText(d and d.name or L["Loading item data …"])
+    rq.name:SetTextColor(qr, qg, qb)
+    rq.meta:SetText(string.format(L["Requested by %s · %s ago"], CharName(r.from), AgeText(r.t)))
+    RenderMats(rq.mats, r.mats)
+
+    local mine = r.from == ns.PlayerKey() or IsMine(r.from)
+    local have = {}
+    for _, m in ipairs(r.mats) do
+        local own = ns.OwnCount(m[1])
+        if own > 0 then have[#have + 1] = math.min(own, m[2]) .. "x " .. ItemLinkOrName(m[1]) end
+    end
+    if mine then
+        rq.hint:SetText(L["This is your request. Close it once you have everything."])
+        rq.act.label:SetText(L["Close request"])
+        rq.act.run = r.from == ns.PlayerKey() and function() ns.CloseRequest(r); Select(nil) end or nil
+    else
+        rq.hint:SetText(#have > 0 and ("|cff5cdb6b" .. L["You have some of these mats – offer them with a whisper."] .. "|r")
+            or L["You don't have any of these mats. Maybe someone else in your guild can help."])
+        rq.act.label:SetText(L["Whisper: I can help"])
+        rq.act.run = function()
+            Whisper(r.from, ns.Subst(L["Hi! I saw your Friendsmith request for {item}. I can help with: {mats}"],
+                { item = ItemLinkOrName(r.item), mats = #have > 0 and table.concat(have, ", ") or L["some of it"] }))
+        end
+    end
+    rq.act:SetActive(rq.act.run ~= nil)
+end
+
 function RenderDetail()
     if not detail then return end
-    ov:Hide(); it:Hide(); fd:Hide()
-    if selEntry and selEntry.food then
+    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide()
+    if selEntry and selEntry.request then
+        rq:Show()
+        RenderRequest(selEntry)
+    elseif selEntry and selEntry.food then
         fd:Show()
         RenderFood(selEntry)
     elseif selEntry then
@@ -1389,6 +1664,7 @@ local function CreateDetail()
     CreateOverview(detail)
     CreateItemView(detail)
     CreateFoodView(detail)
+    CreateRequestView(detail)
 end
 
 ---------------------------------------------------------------------------

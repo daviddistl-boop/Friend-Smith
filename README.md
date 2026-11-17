@@ -17,6 +17,7 @@ Languages: English and German (follows your game client).
   - **For me** – who can craft something better for you or your alts?
   - **I can craft** – who can you craft something better for with your professions (your alts, guild and friends)?
   - **Guild & friends** – everything at a glance.
+  - **Mat requests** – which mats your guild is looking for right now, and whether you have some.
   - **Buff food** – who can cook the best "Well Fed" food in each category (Stamina & Spirit, Agility, Strength, Intellect, Mana regeneration …), best first.
 
   The list is grouped by character (or by crafter) and collapsible, just like the profession window.
@@ -25,6 +26,11 @@ Languages: English and German (follows your game client).
   In the cooking window it lists your buff food by category instead – gold means nobody you know cooks anything better.
   Click to open the recipe, right-click to show it in the Friendsmith window.
   Drag the panel by its header, or turn it off in the window's sidebar.
+- **Mats:** the details of an upgrade list the mats it needs – how many you have (bags and bank of all your characters),
+  how many are in the guild bank and what's missing. *Ask for mats* creates a request your guild sees in Friendsmith
+  and prepares a guild chat message – nothing is sent until you press Enter.
+- **Guild bank:** when someone with Friendsmith opens the guild bank, the tabs they can see are shared with the guild.
+  It's a snapshot, so the window shows how old it is.
 - **Item tooltips** show "craftable by …" and "upgrade for …".
 - **Addon button** with its own logo:
   - Broker launcher for bars like Titan Panel, ChocolateBar or Bazooka (shows "X for me · Y craftable")

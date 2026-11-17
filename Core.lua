@@ -474,8 +474,9 @@ function ns.ScanRecipes(verbose)
     for itemID in pairs(map) do
         added = added + AddRecipe(rec, itemID, cooking)
     end
+    local newMats = ns.RecordReagents and ns.RecordReagents(map, rec) or 0
 
-    if added > 0 then
+    if added > 0 or newMats > 0 then
         ns.MarkDirty()
         ns.Debounce("sendrecipes", 20, function()
             if ns.SendChar then ns.SendChar(ns.PlayerKey(), "R") end

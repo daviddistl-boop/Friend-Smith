@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0
+- **Mats:** the details of an upgrade now list the mats it needs – how many you have (bags and bank of all your
+  characters), how many are in the guild bank and what's still missing.
+- **Guild bank:** whenever someone with Friendsmith opens the guild bank, its contents (tabs they can see) are
+  shared with the guild. The window shows how old that snapshot is.
+- **Mat requests:** *Ask for mats* saves a request for the missing mats that everyone in your guild with Friendsmith
+  sees under the new *Mat requests* view, and prepares a guild chat message (you press Enter to send it).
+  Requests show whether you have some of the mats and offer a whisper button; they expire after 3 days
+  or when you close them.
+- Recipe mats are recorded when a crafter opens their profession window, so crafters need to open it once after updating.
+
 ## 0.6.1
 - The panel next to the profession window now also works for Cooking: it lists your buff food by category,
   strongest first. Gold means nobody you know can cook anything better in that category.
