@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.0
+- **Guild feed:** a new view with the nice moments of your guild – profession steps (75/150/225/300), level milestones,
+  finished mat requests and thank-yous. Everyone sees that people in the guild help each other.
+- **Say thanks:** thank someone with one click – in the guild feed (name or your current target), next to the crafter of an
+  upgrade, or after a trade: when a guild member or friend gives you something, Friendsmith asks whether you'd like to say thanks.
+  They get a short note and it shows up in the feed. You see how many thank-yous you've received.
+- Congratulate others on their milestones with a prepared whisper.
+- Only fixed texts, no free text; entries are only accepted from the player they're about.
+- New commands: `/fsmith thanks Name [item]`, `/fsmith feed`, `/fsmith milestones` (share your milestones on/off),
+  `/fsmith tradethanks` (prompt after trades on/off).
+- The *Rescan gear* button was removed from the sidebar to make room – `/fsmith scan` still does it.
+
 ## 0.10.0
 - **Silent wishes:** not everyone likes to ask for help. Tick *Happy about help* in the sidebar and Friendsmith asks for you:
   guild members and friends see by themselves what they could craft for you and which mats you need for your profession.

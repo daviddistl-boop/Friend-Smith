@@ -320,6 +320,7 @@ function ns.CloseRequest(r)
     if not r or r.from ~= ns.PlayerKey() then return end
     DB().requests[r.id] = nil
     if ns.Enqueue then ns.Enqueue(table.concat({ ns.PROTO, "X", r.from, r.t }, ";"), "GUILD") end
+    if ns.PostEvent then ns.PostEvent("req", r.item) end
     ns.Debounce("matsui", 0.2, function() if ns.RefreshUI then ns.RefreshUI() end end)
 end
 

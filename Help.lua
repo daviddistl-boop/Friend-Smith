@@ -142,6 +142,7 @@ function ns.RecordProfession(map, rec)
     for i = #cands, MAX_CANDS + 1, -1 do cands[i] = nil end
     rec.profs = rec.profs or {}
     local old = rec.profs[name]
+    if old and ns.CheckProfStep then ns.CheckProfStep(name, old.rank, rank) end
     local changed = not old or old.rank ~= rank or old.max ~= max or #old.cands ~= #cands
     if not changed then
         for i, c in ipairs(cands) do

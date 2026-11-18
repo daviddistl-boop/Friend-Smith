@@ -24,6 +24,8 @@ local DEFAULTS = {
     shareFriends = true, -- auch mit Freunden (Freundesliste) austauschen, die Friendsmith nutzen
     wishes     = false, -- "Ich freue mich ueber Hilfe": andere sehen von selbst, womit sie helfen koennten
     nudges     = true,  -- beim Login kurz zeigen, wem ich helfen koennte
+    feedEvents = true,  -- eigene Meilensteine im Gilden-Feed teilen
+    tradeThanks = true, -- nach einem Handel mit Gilde/Freunden fragen, ob man Danke sagen moechte
 }
 
 function ns.Print(msg)

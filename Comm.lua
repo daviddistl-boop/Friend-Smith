@@ -192,6 +192,7 @@ function ns.BroadcastAll()
     end
     if ns.BroadcastExtra then ns.BroadcastExtra() end
     if ns.BroadcastStock then ns.BroadcastStock() end
+    if ns.BroadcastFeed then ns.BroadcastFeed() end
 end
 
 -- Alle eigenen Charaktere an einen Freund.
@@ -249,6 +250,7 @@ function ns.HandlePayload(sender, payload, channel)
     -- Zutaten, Gildenbank, Mats-Gesuche (Mats.lua)
     if ns.HandleExtra and ns.HandleExtra(kind, f, sender, channel) then return end
     if ns.HandleStock and ns.HandleStock(kind, f, sender, channel) then return end
+    if ns.HandleFeed and ns.HandleFeed(kind, f, sender, channel) then return end
 
     local key = f[3]
     if not key or key == "" then return end

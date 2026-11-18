@@ -14,6 +14,10 @@ ignore:
   - CURSEFORGE.md
   - RELEASE.md
 
+# Wird bei jedem automatischen Upload als optionale Abhaengigkeit eingetragen
+optional-dependencies:
+  - oneforall-forever
+
 manual-changelog:
   filename: CHANGELOG.md
   markup-type: markdown
