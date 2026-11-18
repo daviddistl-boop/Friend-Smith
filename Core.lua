@@ -208,7 +208,7 @@ local function Evaluate(key, rec, itemID)
                 if not cd then return nil end
                 curIlvl = cd.ilvl
                 if w then
-                    local cs = ns.ItemStats(cur, suffix[slot])
+                    local cs = ns.CurStats(rec, slot, cur)
                     if not cs then return nil end
                     curScore = ns.Score(w, cs)
                 end
@@ -397,7 +397,7 @@ function ns.UpdateSelf(levelOverride)
     rec.level = levelOverride or UnitLevel("player")
     rec.guild = GetGuildInfo("player")
     rec.updated = time()
-    local gear, suffix, ench = {}, {}, {}
+    local gear, suffix, ench, links = {}, {}, {}, {}
     for _, slot in ipairs(ns.GEAR_SLOTS) do
         local id = GetInventoryItemID("player", slot)
         if id then
@@ -405,6 +405,7 @@ function ns.UpdateSelf(levelOverride)
             local link = GetInventoryItemLink and GetInventoryItemLink("player", slot)
             -- item:ID:Verzauberung:... (nur lokal fuer die Verzauberungs-Ansicht)
             ench[slot] = link and tonumber(link:match("item:%d+:(%d*)")) or 0
+            links[slot] = link and link:match("(item:[%-%d:]+)") or nil
             -- item:ID:Verzauberung:Sockel1-4:Zufallseigenschaft
             local sfx = link and tonumber(link:match("item:%d+:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:(%-?%d+)"))
             if sfx and sfx ~= 0 then suffix[slot] = sfx end
@@ -413,6 +414,7 @@ function ns.UpdateSelf(levelOverride)
     rec.gear = gear
     rec.suffix = suffix
     rec.ench = ench
+    rec.links = links
     if ns.DetectSpec then rec.spec = ns.DetectSpec() end
     rec.wish = ns.S.wishes or nil
     rec.help = ns.MyHelpTopics and ns.MyHelpTopics() or nil

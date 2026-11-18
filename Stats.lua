@@ -251,14 +251,15 @@ end
 local statCache = {}
 
 -- suffix = Zufallseigenschaft ("... des Affen"), damit gruene Teile richtig bewertet werden
-function ns.ItemStats(itemID, suffix)
+-- fullLink = kompletter Gegenstands-Link des getragenen Teils (mit allen Boni) – der genaueste Weg
+function ns.ItemStats(itemID, suffix, fullLink)
     if not itemID then return nil end
     suffix = tonumber(suffix) or 0
-    local ck = itemID .. ":" .. suffix
+    local ck = fullLink or (itemID .. ":" .. suffix)
     local s = statCache[ck]
     if s then return s end
     if not ns.ItemData(itemID) then return nil end
-    local link = (suffix ~= 0) and ("item:" .. itemID .. ":0:0:0:0:0:" .. suffix) or ("item:" .. itemID)
+    local link = fullLink or ((suffix ~= 0) and ("item:" .. itemID .. ":0:0:0:0:0:" .. suffix) or ("item:" .. itemID))
     local raw
     if GetItemStatsFn then
         local ok, res = pcall(GetItemStatsFn, link)
@@ -269,6 +270,17 @@ function ns.ItemStats(itemID, suffix)
     for short, full in pairs(STAT_KEYS) do s[short] = tonumber(raw[full]) or 0 end
     statCache[ck] = s
     return s
+end
+
+-- Werte des Teils, das ein Charakter in einem Platz traegt: bevorzugt ueber den echten Link
+-- (WoW Forever speichert Zufallseigenschaften wie "des Falken" anders als Classic)
+function ns.CurStats(rec, slot, itemID)
+    local l = rec and rec.links and rec.links[slot]
+    if l and tonumber(l:match("item:(%d+)")) == itemID then
+        local s = ns.ItemStats(itemID, nil, l)
+        if s then return s end
+    end
+    return ns.ItemStats(itemID, rec and rec.suffix and rec.suffix[slot])
 end
 
 function ns.Score(w, s)

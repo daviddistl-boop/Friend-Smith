@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.7
+- Fixed: worn items with random bonuses ("… of the Falcon") were rated without those stats on WoW Forever, so worse
+  items showed up as big upgrades (e.g. +286 %). Friendsmith now rates worn items by their full item link, including
+  all bonuses, and shares those links with the guild. Log in once on each character after updating.
+
 ## 0.14.6
 - The spec is now also detected on WoW Forever without OneForAll: Friendsmith reads the new talent system itself and
   assigns the talents to the three trees by their sub-tree (or position, left to right). OneForAll is still used first

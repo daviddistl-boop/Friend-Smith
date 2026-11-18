@@ -1069,7 +1069,7 @@ local function ShowEntryTooltip(owner, e)
     GameTooltip:AddLine(L["Improvement: "] .. GainText(e) .. "  (" .. ns.SpecLabel(e.target) .. ")", 0.36, 0.86, 0.42)
     if e.setLoss then GameTooltip:AddLine(L["set bonus lost"], 1, 0.4, 0.4) end
     local tr = Rec(e.target)
-    local diffs = ns.StatDiffText(ns.ItemStats(e.itemID), e.cur and ns.ItemStats(e.cur, tr and tr.suffix and tr.suffix[e.slot]), ns.WeightsFor(e.target))
+    local diffs = ns.StatDiffText(ns.ItemStats(e.itemID), e.cur and ns.CurStats(tr, e.slot, e.cur), ns.WeightsFor(e.target))
     if diffs ~= "" then GameTooltip:AddLine(diffs, 1, 1, 1, true) end
     GameTooltip:AddLine(L["Craftable by: "] .. CrafterNames(e.crafters), 1, 1, 1, true)
     GameTooltip:AddLine(L["Click: details · Shift-click: link · Ctrl-click: try on"], 0.6, 0.6, 0.6)
@@ -1789,7 +1789,7 @@ local function RenderItem(e)
     it.spec:SetText(L["Rated by: "] .. "|cffe6e6eb" .. ns.SpecLabel(e.target) .. "|r")
     local w = ns.WeightsFor(e.target)
     local tr = Rec(e.target)
-    local diffs = ns.StatDiffText(ns.ItemStats(e.itemID), e.cur and ns.ItemStats(e.cur, tr and tr.suffix and tr.suffix[e.slot]), w)
+    local diffs = ns.StatDiffText(ns.ItemStats(e.itemID), e.cur and ns.CurStats(tr, e.slot, e.cur), w)
     it.statLine:SetText((diffs ~= "" and diffs or L["No known stat differences"]) .. (e.setLoss and ("  |cffff6666" .. L["set bonus lost"] .. "|r") or ""))
 
     for i, r in ipairs(it.crafters) do

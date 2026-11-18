@@ -165,6 +165,9 @@ local function CharPayloads(key, what)
         list[#list + 1] = table.concat({ PROTO, "G", key, rec.class or "", tostring(rec.level or 0), table.concat(parts, ","),
             tostring(rec.spec or 0), table.concat(sfx, ","), rec.wish and "1" or "0" }, ";")
         gIndex = #list
+        -- komplette Links der getragenen Teile ("L"), damit Zufallseigenschaften ueberall stimmen
+        local links = sortedPairsList(rec.links, function(slot, l) return slot .. "=" .. l end)
+        if #links > 0 then list[#list + 1] = table.concat({ PROTO, "L", key, table.concat(links, ",") }, ";") end
     end
     if what ~= "G" then
         local ids = sortedPairsList(rec.recipes, function(id) return tostring(id) end)
@@ -402,6 +405,13 @@ function ns.HandlePayload(sender, payload, channel)
         if ns.ParseProfession then ns.ParseProfession(rec, f) end
     elseif kind == "F" then
         if ns.ParseHelp then ns.ParseHelp(rec, f) end
+    elseif kind == "L" then
+        local links = {}
+        for sslot, l in (f[4] or ""):gmatch("(%d+)=(item:[%-%d:]+)") do
+            local slot = tonumber(sslot)
+            if slot and slot >= 1 and slot <= 19 and #l <= 160 then links[slot] = l end
+        end
+        rec.links = links
     elseif kind == "V" then
         if ns.ParseEnchants then ns.ParseEnchants(rec, f) end
     elseif kind == "C" then
