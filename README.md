@@ -88,6 +88,7 @@ Languages: English and German (follows your game client).
 | `/fsmith cleanup` | Remove old data now |
 | `/fsmith stock` | Open the guild stock |
 | `/fsmith target [item] 40` | Set a stock target, officers only (0 removes it) |
+| `/fsmith foodcheck` | Check how your cooking recipes are rated |
 | `/fsmith debug` | Show incoming Friendsmith messages in chat (on/off) |
 | `/fsmith reset` | Delete stored data of other guild members |
 | `/fsmith help` | List all commands |

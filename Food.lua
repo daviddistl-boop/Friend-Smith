@@ -18,9 +18,32 @@ local STATS = {
 }
 
 local USE_PREFIX = ITEM_SPELL_TRIGGER_ONUSE -- "Benutzen:" / "Use:"
--- Name des Buffs "Satt" / "Well Fed" aus dem Client
-local WELL_FED = ((C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(19705))
-    or (GetSpellInfo and GetSpellInfo(19705)) or "Well Fed"):lower()
+
+-- Woerter fuer den "Satt"-Bonus. Der Buffname kommt aus dem Client (erst bei Bedarf abfragen –
+-- beim Laden des Addons sind Zauberdaten oft noch nicht da), dazu feste Rueckfaelle.
+local wellFedWords
+local function WellFedWords()
+    if wellFedWords then return wellFedWords end
+    local w = { "well fed", "gesättigt", "wohlgenährt" }
+    local n = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(19705)) or (GetSpellInfo and GetSpellInfo(19705))
+    if n and n ~= "" then
+        w[#w + 1] = n:lower()
+        wellFedWords = w -- nur merken, wenn der Client den Namen geliefert hat
+    end
+    return w
+end
+
+local function IsWellFed(low)
+    for _, word in ipairs(WellFedWords()) do
+        if low:find(word, 1, true) then return true end
+    end
+    -- "satt" als ganzes Wort (nicht "statt", "Sattel" …)
+    return low:find("%f[%a]satt%f[%A]") ~= nil
+end
+
+local function Plain(t)
+    return (t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+end
 
 ---------------------------------------------------------------------------
 -- Tooltip-Text eines Gegenstands lesen
@@ -65,27 +88,31 @@ end
 ---------------------------------------------------------------------------
 local cache = {}
 
-function ns.FoodBuff(itemID)
-    local c = cache[itemID]
-    if c ~= nil then return c or nil end
+-- Auswertung mit Grund (fuer /fsmith foodcheck): buff oder nil, Grund, Text
+local function Analyze(itemID)
     local d = ns.ItemData(itemID)
-    if not d then return nil end -- noch nicht geladen
-    if d.class ~= 0 or (d.loc and d.loc ~= "") then cache[itemID] = false; return nil end
+    if not d then return nil, "loading" end
+    if d.class ~= 0 or (d.loc and d.loc ~= "") then return nil, "noconsumable" end
 
-    -- nur die "Benutzen:"-Zeile(n) auswerten
+    local lines = TooltipLines(itemID)
     local text
-    for _, line in ipairs(TooltipLines(itemID)) do
-        if not USE_PREFIX or line:find(USE_PREFIX, 1, true) == 1 then
+    for i, line in ipairs(lines) do
+        line = Plain(line)
+        if i > 1 and (not USE_PREFIX or line:find(USE_PREFIX, 1, true)) then
             text = (text and (text .. " ") or "") .. line
         end
     end
-    if not text then return nil end -- Tooltip noch leer: spaeter nochmal versuchen
+    if not text then
+        -- kein "Benutzen:" gefunden: alle Zeilen ausser dem Namen nehmen, falls dort "satt" steht
+        local all = {}
+        for i, line in ipairs(lines) do if i > 1 then all[#all + 1] = Plain(line) end end
+        local joined = table.concat(all, " ")
+        if joined ~= "" and IsWellFed(joined:lower()) then text = joined end
+    end
+    if not text then return nil, (#lines <= 1) and "notooltip" or "nouse" end
 
     local low = text:lower()
-    if not low:find(WELL_FED, 1, true) and not low:find("well fed", 1, true) then
-        cache[itemID] = false -- kein Essen-Buff (z. B. Elixier)
-        return nil
-    end
+    if not IsWellFed(low) then return nil, "nowellfed", text end
     local keys, labels, amount, firstPos = {}, {}, 0, nil
     for _, s in ipairs(STATS) do
         local pos = low:find(s.name:lower(), 1, true)
@@ -98,16 +125,49 @@ function ns.FoodBuff(itemID)
             end
         end
     end
-    if #keys == 0 then cache[itemID] = false; return nil end
-
-    c = {
+    if #keys == 0 then return nil, "nostat", text end
+    local clean = USE_PREFIX and text:gsub("^%s*" .. USE_PREFIX:gsub("%p", "%%%0") .. "%s*", "") or text
+    return {
         cat = table.concat(keys, "+"),
         label = table.concat(labels, " & "),
         amount = amount,
-        text = (text:gsub("^" .. (USE_PREFIX and USE_PREFIX:gsub("%p", "%%%0") or "") .. "%s*", "")),
-    }
-    cache[itemID] = c
-    return c
+        text = clean,
+    }, "ok", text
+end
+
+function ns.FoodBuff(itemID)
+    local c = cache[itemID]
+    if c ~= nil then return c or nil end
+    local buff, why = Analyze(itemID)
+    if buff then
+        cache[itemID] = buff
+    elseif why == "noconsumable" or why == "nowellfed" or why == "nostat" then
+        cache[itemID] = false -- endgueltig kein Buff-Essen
+    end
+    -- "loading"/"notooltip"/"nouse": spaeter noch einmal versuchen
+    return buff
+end
+
+-- /fsmith foodcheck: zeigt, wie Friendsmith die eigenen Koch-Rezepte bewertet
+function ns.FoodCheck()
+    wipe(cache)
+    local rec = FriendsmithDB.chars[ns.PlayerKey()]
+    local counts, samples = {}, {}
+    for itemID in pairs(rec and rec.recipes or {}) do
+        local d = ns.ItemData(itemID)
+        if d and d.class == 0 then
+            local buff, why, text = Analyze(itemID)
+            counts[why] = (counts[why] or 0) + 1
+            if #samples < 8 and why ~= "noconsumable" then
+                samples[#samples + 1] = string.format("%s: %s%s", d.name, buff and ("|cff5cdb6b" .. buff.label .. " +" .. buff.amount .. "|r") or ("|cffff6060" .. why .. "|r"),
+                    (not buff and text) and ("  |cff8f96a8" .. text:sub(1, 90) .. "|r") or "")
+            end
+        end
+    end
+    ns.Print(string.format(L["Food check: %d buff food, %d without \"Well Fed\", %d without a Use line, %d not loaded yet."],
+        counts.ok or 0, (counts.nowellfed or 0) + (counts.nostat or 0), (counts.nouse or 0) + (counts.notooltip or 0), counts.loading or 0))
+    for _, line in ipairs(samples) do ns.Print("  " .. line) end
+    ns.MarkDirty()
 end
 
 ---------------------------------------------------------------------------

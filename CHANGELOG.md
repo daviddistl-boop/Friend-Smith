@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.1
+- Fixed: buff food wasn't recognized on some clients ("none of your cooking recipes gives Well Fed").
+  The "Well Fed" name is now looked up when needed instead of at login, colored tooltip lines are handled,
+  and the German "satt" is recognized directly.
+- New command `/fsmith foodcheck`: shows how Friendsmith rates your cooking recipes – helpful for bug reports.
+
 ## 0.14.0
 - **Enchanting view:** shows your gear without an enchant and which enchants your guild's enchanters know for it –
   plus armor kits your leatherworkers can make for chest, legs, hands and feet. One click whispers the right person.

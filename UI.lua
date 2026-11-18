@@ -3088,6 +3088,8 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.Print(ns.S.nudges and L["Login hints on."] or L["Login hints off."])
     elseif msg == "help me" or msg == "helfen" then
         if (ns.Nudge(true) or 0) == 0 then ns.Print(L["Right now nobody needs anything you have."]) end
+    elseif msg == "foodcheck" or msg == "essen" then
+        ns.FoodCheck()
     elseif msg == "debug" then
         ns.S.debug = not ns.S.debug or nil
         ns.Print(ns.S.debug and L["Debug on: incoming Friendsmith messages are shown in chat."] or L["Debug off."])
