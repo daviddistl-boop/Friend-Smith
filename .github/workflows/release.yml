@@ -11,11 +11,14 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # noetig, damit der Packager auch ein GitHub-Release anlegen darf
+    permissions:
+      contents: write
     env:
       CF_API_KEY: ${{ secrets.CF_API_KEY }}
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: BigWigsMods/packager@v2
