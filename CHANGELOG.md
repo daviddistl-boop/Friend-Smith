@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.14.0
+- **Enchanting view:** shows your gear without an enchant and which enchants your guild's enchanters know for it –
+  plus armor kits your leatherworkers can make for chest, legs, hands and feet. One click whispers the right person.
+  Enchanters: open your enchanting window once so your guild sees your formulas.
+- **Spare gear to disenchant:** green, blue and purple gear in your bags that none of your characters needs.
+  Friendsmith estimates what it would disenchant into, who in the guild needs those mats right now (mat requests,
+  guild stock, profession help) and which enchanter has the skill – and offers to whisper them.
+  If a guild member could wear the item, it suggests giving it to them instead.
+- **Your help this week:** the overview card shows how many people you helped this week – items given in trades,
+  thank-yous received, help offered and welcomes. Only you can see it.
+
 ## 0.13.0
 - **Helper profile:** in *Settings → Helper profile* you can tick what you're happy to help with – crafting, sharing mats,
   dungeons, quests, gathering, questions & tips or leveling together. Fixed topics only, no free text.

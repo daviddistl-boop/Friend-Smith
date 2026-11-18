@@ -43,7 +43,7 @@ local function TooltipLines(itemID)
     scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
     scanTip:ClearLines()
     scanTip:SetHyperlink("item:" .. itemID)
-    for i = 1, scanTip:NumLines() do
+    for i = 1, scanTip:NumLines() or 0 do
         local fs = _G["FriendsmithScanTipTextLeft" .. i]
         local t = fs and fs:GetText()
         if t then out[#out + 1] = t end

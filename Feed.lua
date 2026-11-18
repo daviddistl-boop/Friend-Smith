@@ -191,6 +191,7 @@ function ns.HandleFeed(kind, f, sender, channel)
         -- Danke an mich? Kurz im eigenen Chat zeigen und mitzaehlen
         if new and ns.SameName(to, ns.PlayerKey()) then
             ns.S.thanksReceived = (ns.S.thanksReceived or 0) + 1
+            ns.LogHelp("thanks", key, item)
             local what = Link(item)
             ns.Print("|cffff8fc8" .. (what and string.format(L["%s says thanks for %s!"], ns.ShortName(key), what)
                 or string.format(L["%s says thanks!"], ns.ShortName(key))) .. "|r")
@@ -250,11 +251,55 @@ end
 ---------------------------------------------------------------------------
 -- Handeln: nach einem Handel mit Gilde/Freunden anbieten, Danke zu sagen
 ---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+-- Eigene Hilfe-Bilanz (nur lokal, nie verschickt)
+---------------------------------------------------------------------------
+-- kind: "trade" (etwas gegeben), "thanks" (Danke bekommen), "offer" (Hilfe angeboten), "welcome"
+function ns.LogHelp(kind, who, item)
+    if not ns.S then return end
+    ns.S.helpLog = ns.S.helpLog or {}
+    local log = ns.S.helpLog
+    local now = time()
+    log[#log + 1] = { t = now, k = kind, w = who and ns.ShortName(who) or nil, i = tonumber(item) }
+    for i = #log, 1, -1 do
+        if now - log[i].t > 30 * 86400 then table.remove(log, i) end
+    end
+    while #log > 300 do table.remove(log, 1) end
+    Changed()
+end
+
+-- { people = Anzahl verschiedener Spieler, trade, thanks, offer, welcome }
+function ns.HelpTally(days)
+    local out = { people = 0, trade = 0, thanks = 0, offer = 0, welcome = 0 }
+    local since = time() - (days or 7) * 86400
+    local seen = {}
+    for _, e in ipairs(ns.S and ns.S.helpLog or {}) do
+        if e.t >= since then
+            out[e.k] = (out[e.k] or 0) + 1
+            if e.w and e.k ~= "offer" and not seen[e.w] then seen[e.w] = true; out.people = out.people + 1 end
+        end
+    end
+    return out
+end
+
 local trade = {}
 
 local function TradePartner()
     local name = UnitName and UnitName("NPC")
     return name
+end
+
+local function GivenItem()
+    if not GetTradePlayerItemLink then return nil, false end
+    local first, any
+    for i = 1, 6 do
+        local link = GetTradePlayerItemLink(i)
+        if link then
+            any = true
+            first = first or tonumber(link:match("item:(%d+)"))
+        end
+    end
+    return first, any
 end
 
 local function ReceivedItem()
@@ -297,7 +342,7 @@ local function OfferThanks(name, item)
 end
 
 local ev = CreateFrame("Frame")
-for _, e in ipairs({ "PLAYER_LEVEL_UP", "TRADE_SHOW", "TRADE_TARGET_ITEM_CHANGED", "TRADE_ACCEPT_UPDATE", "UI_INFO_MESSAGE", "TRADE_CLOSED" }) do
+for _, e in ipairs({ "PLAYER_LEVEL_UP", "TRADE_SHOW", "TRADE_TARGET_ITEM_CHANGED", "TRADE_PLAYER_ITEM_CHANGED", "TRADE_ACCEPT_UPDATE", "UI_INFO_MESSAGE", "TRADE_CLOSED" }) do
     pcall(ev.RegisterEvent, ev, e)
 end
 ev:SetScript("OnEvent", function(_, event, a1, a2)
@@ -308,18 +353,26 @@ ev:SetScript("OnEvent", function(_, event, a1, a2)
         end
     elseif event == "TRADE_SHOW" then
         trade = { name = TradePartner() }
-    elseif event == "TRADE_TARGET_ITEM_CHANGED" or event == "TRADE_ACCEPT_UPDATE" then
+    elseif event == "TRADE_TARGET_ITEM_CHANGED" or event == "TRADE_PLAYER_ITEM_CHANGED" or event == "TRADE_ACCEPT_UPDATE" then
         trade.name = trade.name or TradePartner()
         local item, any = ReceivedItem()
         if any then trade.item, trade.any = item, true end
         local money = GetTargetTradeMoney and GetTargetTradeMoney() or 0
         if money and money > 0 then trade.any = true end
+        local given, gave = GivenItem()
+        if gave then trade.given, trade.gave = given, true end
     elseif event == "UI_INFO_MESSAGE" then
         local msg = type(a2) == "string" and a2 or a1
-        if ERR_TRADE_COMPLETE and msg == ERR_TRADE_COMPLETE and trade.any then
+        if ERR_TRADE_COMPLETE and msg == ERR_TRADE_COMPLETE then
             local t = trade
             trade = {}
-            C_Timer.After(1, function() OfferThanks(t.name, t.item) end)
+            -- etwas an Gilde/Freunde gegeben? -> eigene Bilanz
+            if t.gave and t.name then
+                local key = ResolveKey(t.name)
+                local rec = key and FriendsmithDB.chars[key]
+                if rec and not rec.mine then ns.LogHelp("trade", key, t.given) end
+            end
+            if t.any then C_Timer.After(1, function() OfferThanks(t.name, t.item) end) end
         end
     end
 end)

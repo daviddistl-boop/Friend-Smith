@@ -179,6 +179,9 @@ local function CharPayloads(key, what)
         -- Helfer-Profil (aeltere Versionen ignorieren "F")
         local help = ns.HelpPayload and ns.HelpPayload(rec)
         if help then list[#list + 1] = table.concat({ PROTO, "F", key, help }, ";") end
+        -- Verzauberungsformeln (aeltere Versionen ignorieren "V")
+        local ench = ns.EnchantPayload and ns.EnchantPayload(rec)
+        if ench then list[#list + 1] = table.concat({ PROTO, "V", key, ench }, ";") end
     end
     local digest
     if what == nil then
@@ -396,6 +399,8 @@ function ns.HandlePayload(sender, payload, channel)
         if ns.ParseProfession then ns.ParseProfession(rec, f) end
     elseif kind == "F" then
         if ns.ParseHelp then ns.ParseHelp(rec, f) end
+    elseif kind == "V" then
+        if ns.ParseEnchants then ns.ParseEnchants(rec, f) end
     elseif kind == "R" then
         local s = {}
         for id in (f[4] or ""):gmatch("%d+") do s[tonumber(id)] = true end

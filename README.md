@@ -17,6 +17,7 @@ Languages: English and German (follows your game client).
   - **For me** – who can craft something better for you or your alts?
   - **I can craft** – who can you craft something better for with your professions (your alts, guild and friends)?
   - **Guild & friends** – everything at a glance.
+  - **Enchanting** – your gear without an enchant and who in the guild can enchant it (or make an armor kit), plus spare gear an enchanter could turn into mats others need.
   - **Helpers** – who is happy to help with what (from their helper profile), and who is new in the guild.
   - **Guild feed** – profession steps, level milestones, finished mat requests and thank-yous of your guild.
   - **Profession help** – who is leveling a profession, how many points to the next big step and which mats they need.
@@ -80,6 +81,7 @@ Languages: English and German (follows your game client).
 | `/fsmith feed` | Open the guild feed |
 | `/fsmith milestones` | Share your milestones in the guild feed on/off |
 | `/fsmith tradethanks` | Thank-you prompt after trades on/off |
+| `/fsmith ench` | Enchants for your gear and spare gear to disenchant |
 | `/fsmith helpers` | Who is happy to help with what |
 | `/fsmith profile` | Set up your helper profile |
 | `/fsmith settings` | Open the settings |

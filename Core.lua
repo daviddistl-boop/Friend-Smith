@@ -232,6 +232,13 @@ local function Evaluate(key, rec, itemID)
     return nil
 end
 
+-- Fuer andere Module: waere itemID ein Upgrade fuer den Charakter key?
+function ns.EvaluateFor(key, itemID)
+    local rec = FriendsmithDB.chars[key]
+    if not rec or not rec.gear or not rec.class then return nil end
+    return Evaluate(key, rec, itemID)
+end
+
 ---------------------------------------------------------------------------
 -- Berechnung
 ---------------------------------------------------------------------------
@@ -363,12 +370,14 @@ function ns.UpdateSelf(levelOverride)
     rec.level = levelOverride or UnitLevel("player")
     rec.guild = GetGuildInfo("player")
     rec.updated = time()
-    local gear, suffix = {}, {}
+    local gear, suffix, ench = {}, {}, {}
     for _, slot in ipairs(ns.GEAR_SLOTS) do
         local id = GetInventoryItemID("player", slot)
         if id then
             gear[slot] = id
             local link = GetInventoryItemLink and GetInventoryItemLink("player", slot)
+            -- item:ID:Verzauberung:... (nur lokal fuer die Verzauberungs-Ansicht)
+            ench[slot] = link and tonumber(link:match("item:%d+:(%d*)")) or 0
             -- item:ID:Verzauberung:Sockel1-4:Zufallseigenschaft
             local sfx = link and tonumber(link:match("item:%d+:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:(%-?%d+)"))
             if sfx and sfx ~= 0 then suffix[slot] = sfx end
@@ -376,6 +385,7 @@ function ns.UpdateSelf(levelOverride)
     end
     rec.gear = gear
     rec.suffix = suffix
+    rec.ench = ench
     if ns.DetectSpec then rec.spec = ns.DetectSpec() end
     rec.wish = ns.S.wishes or nil
     rec.help = ns.MyHelpTopics and ns.MyHelpTopics() or nil
@@ -482,6 +492,7 @@ function ns.ScanRecipes(verbose)
     end
     local newMats = ns.RecordReagents and ns.RecordReagents(map, rec) or 0
     local profChanged = ns.RecordProfession and ns.RecordProfession(map, rec) or false
+    if ns.RecordEnchants and ns.RecordEnchants(rec) then profChanged = true end
 
     if added > 0 or newMats > 0 or profChanged then
         ns.MarkDirty()

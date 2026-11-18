@@ -302,6 +302,7 @@ local showSettings = false
 local counts = { all = 0, mine = 0, help = 0, food = 0, requests = 0, stock = 0, profs = 0, feed = 0 }
 local feedEntries = {}
 local helperGroups = {}
+local enchSlots, deItems = {}, {}
 local rosterCache = {}
 local profEntries = {}
 local stockEntries = {}
@@ -317,6 +318,8 @@ local function EntryKey(e)
     if e.prof then return "prof#" .. e.key .. ":" .. e.name end
     if e.feedEntry then return "feed#" .. e.f.id end
     if e.helper then return "helper#" .. (e.topic or "new") .. ":" .. e.key end
+    if e.enchSlot then return "ench#" .. e.key .. ":" .. e.slot end
+    if e.deItem then return "de#" .. e.itemID end
     return e.target .. "#" .. e.itemID
 end
 
@@ -330,7 +333,10 @@ local function Matches(e)
     if query == "" then return true end
     local d = ns.ItemData(e.itemID)
     if d and d.name:lower():find(query, 1, true) then return true end
-    if e.helper then
+    if e.enchSlot or e.deItem then
+        return (e.key and ns.ShortName(e.key):lower():find(query, 1, true) ~= nil)
+            or (e.slot and (SLOT_NAMES[e.slot] or ""):lower():find(query, 1, true) ~= nil) or false
+    elseif e.helper then
         return ns.ShortName(e.key):lower():find(query, 1, true) ~= nil
             or (e.topic and ns.TopicLabel(e.topic):lower():find(query, 1, true) ~= nil) or false
     elseif e.feedEntry then
@@ -396,6 +402,17 @@ function Rebuild()
         if selKey and EntryKey(e) == selKey then selEntry = e end
     end
     counts.requests = #reqEntries
+    -- Verzauberungen: freie Plaetze und Teile zum Entzaubern
+    enchSlots = ns.FreeEnchantSlots and ns.FreeEnchantSlots() or {}
+    deItems = ns.DisenchantCandidates and ns.DisenchantCandidates() or {}
+    counts.ench = #enchSlots + #deItems
+    for _, list in ipairs({ enchSlots, deItems }) do
+        for _, e in ipairs(list) do
+            e.crafters = e.crafters or {}
+            if selKey and EntryKey(e) == selKey then selEntry = e end
+        end
+    end
+
     -- Helfer und neue Mitglieder
     helperGroups = {}
     counts.helpers = 0
@@ -449,7 +466,7 @@ function Rebuild()
     if not selEntry then selKey = nil end
 
     local groups, order = {}, {}
-    local grouped = view ~= "food" and view ~= "requests" and view ~= "stock" and view ~= "profs" and view ~= "feed" and view ~= "helpers"
+    local grouped = view ~= "food" and view ~= "requests" and view ~= "stock" and view ~= "profs" and view ~= "feed" and view ~= "helpers" and view ~= "ench"
     for _, e in ipairs(grouped and results or {}) do
         if InView(e, view) and Matches(e) then
             local keys
@@ -486,6 +503,19 @@ function Rebuild()
     end
 
     wipe(flat)
+    if view == "ench" then
+        for _, g in ipairs({ { "ench:slots", L["Free enchant slots"], enchSlots }, { "ench:de", L["Spare gear to disenchant"], deItems } }) do
+            local items = {}
+            for _, e in ipairs(g[3]) do if Matches(e) then items[#items + 1] = e end end
+            if #items > 0 then
+                local closed = ns.S.collapsed[g[1]]
+                flat[#flat + 1] = { kind = "h", label = g[2], ck = g[1], n = #items, closed = closed }
+                if not closed then
+                    for _, e in ipairs(items) do flat[#flat + 1] = { kind = "i", e = e } end
+                end
+            end
+        end
+    end
     if view == "helpers" then
         for _, g in ipairs(helperGroups) do
             local items = {}
@@ -568,6 +598,8 @@ function Rebuild()
     if #flat == 0 then
         if query ~= "" then
             list.empty:SetText(string.format(L["Nothing found for \"%s\"."], query))
+        elseif view == "ench" then
+            list.empty:SetText(L["Nothing to enchant or disenchant right now.\n\nEnchanters: open your enchanting window once\nso your guild sees your formulas."])
         elseif view == "helpers" then
             list.empty:SetText(L["Nobody has set up a helper profile yet.\n\nTell your guild what you're happy to help with:\nSettings → Helper profile."])
         elseif view == "feed" then
@@ -609,7 +641,8 @@ function Rebuild()
     list.addBar:SetShown(view == "stock" and ns.CanSetTargets())
     list.thankBar:SetShown(view == "feed")
     if view == "feed" then
-        list.thankBar.count:SetText(string.format(L["Thanks received: %d"], ns.S.thanksReceived or 0))
+        local tl = ns.HelpTally and ns.HelpTally(7) or { people = 0 }
+        list.thankBar.count:SetText(string.format(L["Thanks received: %d"], ns.S.thanksReceived or 0) .. "  ·  " .. string.format(L["Helped this week: %d"], tl.people))
     end
     for _, sb in ipairs(list.seg) do
         sb:SetShown(grouped)
@@ -665,7 +698,14 @@ function RenderList()
                 r.icon:SetTexture(d and d.icon or EMPTY_ICON)
                 r.name:SetText(d and d.name or L["Loading …"])
                 r.name:SetTextColor(QualityColor(d and d.quality))
-                if e.helper then
+                if e.enchSlot then
+                    r.meta:SetText(CharName(e.key))
+                    local n = #e.enchants + #e.kits
+                    r.gain:SetText("|cffffd140" .. n .. "|r")
+                elseif e.deItem then
+                    r.meta:SetText(#e.needs > 0 and ("|cff5cdb6b" .. L["needed"] .. "|r") or (e.wearer and ("|cffff8fc8" .. L["wearable"] .. "|r") or ""))
+                    r.gain:SetText(e.bound and ("|cff8f96a8" .. L["bound"] .. "|r") or "")
+                elseif e.helper then
                     r.icon:SetTexture(e.newcomer and "Interface\\Icons\\INV_Misc_Gift_01" or "Interface\\Icons\\Spell_Holy_Heal")
                     r.name:SetText(Rec(e.key) and CharName(e.key) or ns.ShortName(e.name or e.key))
                     r.name:SetTextColor(1, 1, 1)
@@ -838,6 +878,7 @@ local NAV = {
     { view = "profs", label = L["Profession help"], icon = "Interface\\Icons\\INV_Misc_Note_02" },
     { view = "feed", label = L["Guild feed"], icon = "Interface\\Icons\\INV_Scroll_03" },
     { view = "helpers", label = L["Helpers"], icon = "Interface\\Icons\\Spell_Holy_Heal" },
+    { view = "ench", label = L["Enchanting"], icon = "Interface\\Icons\\Trade_Engraving" },
 }
 
 local function CreateSidebar()
@@ -884,6 +925,7 @@ local function CreateSidebar()
     AddTooltip(sidebar.nav[1], L["For me"], L["Who can craft something better for you or your alts?"])
     AddTooltip(sidebar.nav[2], L["I can craft"], L["Who you can craft something better for with your professions – your alts and your guild."])
     AddTooltip(sidebar.nav[3], L["Guild & friends"], L["Everything anyone in your guild or among your friends can craft for anyone."])
+    AddTooltip(sidebar.nav[10], L["Enchanting"], L["Unenchanted gear and which enchants or armor kits your guild can make for it – plus spare gear an enchanter could turn into mats others need."])
     AddTooltip(sidebar.nav[9], L["Helpers"], L["Who is happy to help with what – and who is new in the guild."])
     AddTooltip(sidebar.nav[8], L["Guild feed"], L["Nice moments in your guild: profession steps, level milestones, finished mat requests and thank-yous."])
     AddTooltip(sidebar.nav[7], L["Profession help"], L["Who is leveling a profession and which mats they need for the next big step."])
@@ -948,6 +990,31 @@ local function ShowStockTooltip(owner, e)
 end
 
 local function ShowEntryTooltip(owner, e)
+    if e.enchSlot then
+        GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink("item:" .. e.itemID)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(string.format(L["%s: no enchant yet"], SLOT_NAMES[e.slot] or "?"), 1, 0.82, 0.25)
+        for i = 1, math.min(4, #e.enchants) do
+            local x = e.enchants[i]
+            GameTooltip:AddLine(ns.EnchantName(x.id) .. " – " .. CrafterNames(x.keys), 1, 1, 1, true)
+        end
+        if #e.kits > 0 then GameTooltip:AddLine(string.format(L["Armor kits: %d"], #e.kits), 0.9, 0.9, 0.9) end
+        GameTooltip:Show()
+        return
+    end
+    if e.deItem then
+        GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink("item:" .. e.itemID)
+        GameTooltip:AddLine(" ")
+        local m = {}
+        for _, id in ipairs(e.yield.mats) do local d = ns.ItemData(id); m[#m + 1] = d and d.name or "?" end
+        GameTooltip:AddLine(L["Disenchants into (estimate): "] .. table.concat(m, ", "), 1, 0.82, 0.25, true)
+        if #e.needs > 0 then GameTooltip:AddLine(string.format(L["Needed by %d"], #e.needs), 0.36, 0.86, 0.42) end
+        if e.wearer then GameTooltip:AddLine(string.format(L["%s could wear this!"], ns.ShortName(e.wearer.key)), 1, 0.56, 0.78) end
+        GameTooltip:Show()
+        return
+    end
     if e.helper then
         GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
         GameTooltip:AddLine(Rec(e.key) and CharName(e.key) or ns.ShortName(e.name or e.key), 1, 1, 1)
@@ -1244,7 +1311,7 @@ end
 ---------------------------------------------------------------------------
 -- Detailbereich
 ---------------------------------------------------------------------------
-local ov, it, fd, rq, sk, ph, fv, stv, hp -- ... / Einstellungen / Helfer
+local ov, it, fd, rq, sk, ph, fv, stv, hp, en -- ... / Einstellungen / Helfer / Verzauberung
 
 -- Zutatenliste: "4x Dunkles Leder   du 3 · Bank 6  fehlt 1"
 local function CreateMatsBlock(parent, top, title)
@@ -1372,7 +1439,7 @@ local function CreateOverview(parent)
     ov.cards = {
         StatCard(ov, L["FOR ME"], "Interface\\Icons\\INV_Chest_Chain_05"),
         StatCard(ov, L["I CAN CRAFT"], "Interface\\Icons\\Trade_BlackSmithing"),
-        StatCard(ov, L["CRAFTERS"], "Interface\\Icons\\INV_Misc_Note_01"),
+        StatCard(ov, L["HELPED THIS WEEK"], "Interface\\Icons\\Spell_Holy_Heal"),
         StatCard(ov, L["GUILD & FRIENDS"], "Interface\\Icons\\INV_Misc_Gear_01"),
     }
     for i, c in ipairs(ov.cards) do
@@ -1380,6 +1447,20 @@ local function CreateOverview(parent)
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         c:SetPoint("TOPLEFT", 18 + col * (cw + 10), -62 - row * 64)
     end
+
+    local hc = ov.cards[3]
+    hc:EnableMouse(true)
+    hc:SetScript("OnEnter", function(self)
+        local t = self.tally or {}
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Your help this week"], 1, 1, 1)
+        GameTooltip:AddLine(string.format(L["People you helped: %d"], t.people or 0), 1, 0.82, 0.25)
+        GameTooltip:AddLine(string.format(L["Given in trades: %d · Thank-yous: %d"], t.trade or 0, t.thanks or 0), 0.9, 0.9, 0.9)
+        GameTooltip:AddLine(string.format(L["Help offered: %d · Welcomes: %d"], t.offer or 0, t.welcome or 0), 0.9, 0.9, 0.9)
+        GameTooltip:AddLine(L["Only you can see this."], 0.6, 0.6, 0.6)
+        GameTooltip:Show()
+    end)
+    hc:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     local nl = SectionLabel(ov, L["NEXT STEPS"])
     nl:SetPoint("TOPLEFT", 18, -200)
@@ -1418,7 +1499,9 @@ local function RenderOverview()
     local st = ns.stats or { crafters = 0 }
     ov.cards[1].value:SetText(counts.mine)
     ov.cards[2].value:SetText(counts.help)
-    ov.cards[3].value:SetText(st.crafters)
+    local tally = ns.HelpTally and ns.HelpTally(7) or { people = 0 }
+    ov.cards[3].value:SetText(tally.people)
+    ov.cards[3].tally = tally
     ov.cards[4].value:SetText(counts.all)
 
     local hints = {}
@@ -1720,6 +1803,7 @@ local function RenderItem(e)
         it.ask.run = function()
             local diff = e.cur and ns.Subst(L[" ({gain} for you)"], { gain = GainText(e) }) or L[" (your slot is still empty)"]
             Whisper(e.target, ns.Subst(L["Hi! I can craft you {item}{gain}. Interested? Just bring the mats."], { item = link, gain = diff }))
+            ns.LogHelp("offer", e.target, e.itemID)
         end
         it.ask:SetActive(true)
     elseif foreignCrafter then
@@ -2212,6 +2296,7 @@ local function RenderProf(e)
                 local own = ns.OwnCount(m[1])
                 if own > 0 then have[#have + 1] = math.min(own, m[2]) .. "x " .. ItemLinkOrName(m[1]) end
             end
+            ns.LogHelp("offer", e.key, opt.itemID)
             Whisper(e.key, ns.Subst(L["Hi! I saw you're leveling {prof} ({rank}/{max}). I can help with mats for {item}: {mats}"],
                 { prof = e.name, rank = p.rank, max = p.max, item = ItemLinkOrName(opt.itemID),
                   mats = #have > 0 and table.concat(have, ", ") or L["some of it"] }))
@@ -2258,7 +2343,7 @@ local function RenderFeed(e)
     fv.act.run, fv.thx.run = nil, nil
     if f.kind == "join" then
         fv.act.label:SetText(L["Whisper welcome"])
-        fv.act.run = function() Whisper(f.a, L["Welcome to the guild! If you need anything, just ask – we're happy to help."]) end
+        fv.act.run = function() Whisper(f.a, L["Welcome to the guild! If you need anything, just ask – we're happy to help."]); ns.LogHelp("welcome", f.a) end
     elseif not mine and (f.kind == "prof" or f.kind == "lvl" or f.kind == "req") then
         fv.act.label:SetText(L["Whisper congratulations"])
         fv.act.run = function()
@@ -2360,7 +2445,7 @@ local function RenderHelper(e)
     if e.newcomer then
         hp.hint:SetText(L["Say hello! New members often don't dare to ask – a short welcome helps a lot."])
         hp.act.label:SetText(L["Whisper welcome"])
-        hp.act.run = function() Whisper(e.key, L["Welcome to the guild! If you need anything, just ask – we're happy to help."], e.name) end
+        hp.act.run = function() Whisper(e.key, L["Welcome to the guild! If you need anything, just ask – we're happy to help."], e.name); ns.LogHelp("welcome", e.name or e.key) end
     else
         hp.hint:SetText(e.topic and string.format(L["%s is happy to help with: %s. Don't be shy – just ask!"], ns.ShortName(e.key), ns.TopicLabel(e.topic)) or "")
         hp.act.label:SetText(L["Whisper"])
@@ -2369,6 +2454,184 @@ local function RenderHelper(e)
         end
     end
     hp.act:SetActive(hp.act.run ~= nil)
+end
+
+local function CreateEnchView(parent)
+    en = CreateFrame("Frame", nil, parent)
+    en:SetAllPoints()
+    en.opt = 1
+    local back = CreateFrame("Button", nil, en)
+    back:SetSize(90, 18)
+    back:SetPoint("TOPRIGHT", -14, -12)
+    local bt = Text(back, 10, C.muted, "RIGHT")
+    bt:SetPoint("RIGHT")
+    bt:SetText(L["< Overview"])
+    back:SetScript("OnEnter", function() bt:SetTextColor(1, 1, 1) end)
+    back:SetScript("OnLeave", function() bt:SetTextColor(C.muted[1], C.muted[2], C.muted[3]) end)
+    back:SetScript("OnClick", function() Select(nil) end)
+
+    local ib = CreateFrame("Button", nil, en)
+    ib:SetSize(46, 46)
+    ib:SetPoint("TOPLEFT", 18, -34)
+    en.icon = Icon(ib, 44)
+    en.icon:SetPoint("CENTER")
+    en.iconBorder = Border(ib, C.border)
+    ib:SetScript("OnEnter", function(self)
+        if selEntry then GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetHyperlink("item:" .. selEntry.itemID); GameTooltip:Show() end
+    end)
+    ib:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    en.name = Text(en, 15)
+    en.name:SetPoint("TOPLEFT", ib, "TOPRIGHT", 12, -3)
+    en.name:SetPoint("RIGHT", -18, 0)
+    en.meta = Text(en, 11, C.muted)
+    en.meta:SetPoint("BOTTOMLEFT", ib, "BOTTOMRIGHT", 12, 4)
+    en.meta:SetPoint("RIGHT", -18, 0)
+
+    en.label1 = SectionLabel(en, "")
+    en.label1:SetPoint("TOPLEFT", 18, -96)
+    en.rows = {}
+    for i = 1, 7 do
+        local b = CreateFrame("Button", nil, en)
+        b:SetHeight(18)
+        b:SetPoint("TOPLEFT", 18, -110 - (i - 1) * 19)
+        b:SetPoint("RIGHT", -18, 0)
+        b.sel = Fill(b, C.accentBg)
+        local hl = b:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetColorTexture(1, 1, 1, 0.05)
+        b.text = Text(b, 11)
+        b.text:SetPoint("LEFT", 4, 0)
+        b.text:SetPoint("RIGHT", -4, 0)
+        b.index = i
+        b:SetScript("OnClick", function(self) en.opt = self.index; RenderDetail() end)
+        b:SetScript("OnEnter", function(self)
+            if self.link then GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetHyperlink(self.link); GameTooltip:Show() end
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        en.rows[i] = b
+    end
+    en.label2 = SectionLabel(en, "")
+    en.label2:SetPoint("TOPLEFT", 18, -252)
+    en.text2 = Text(en, 11, C.text)
+    en.text2:SetPoint("TOPLEFT", 18, -268)
+    en.text2:SetPoint("RIGHT", -18, 0)
+    if en.text2.SetWordWrap then en.text2:SetWordWrap(true) end
+    en.hint = Text(en, 11, C.green)
+    en.hint:SetPoint("TOPLEFT", 18, -380)
+    en.hint:SetPoint("RIGHT", -18, 0)
+    if en.hint.SetWordWrap then en.hint:SetWordWrap(true) end
+
+    en.b1 = MakeButton(en, 150, 26, L["Whisper"])
+    en.b1:SetPoint("BOTTOMLEFT", 18, 14)
+    en.b1:SetScript("OnClick", function(self) if self.run then self.run() end end)
+    en.b2 = MakeButton(en, 170, 26, L["Whisper"], true)
+    en.b2:SetPoint("BOTTOMRIGHT", -18, 14)
+    en.b2:SetScript("OnClick", function(self) if self.run then self.run() end end)
+end
+
+local function RenderEnch(e)
+    if en.lastKey ~= EntryKey(e) then en.opt = 1; en.lastKey = EntryKey(e) end
+    local d = ns.ItemData(e.itemID)
+    local qr, qg, qb = QualityColor(d and d.quality)
+    en.icon:SetTexture(d and d.icon or EMPTY_ICON)
+    SetBorderColor(en.iconBorder, qr, qg, qb, 1)
+    en.name:SetText(d and d.name or L["Loading item data …"])
+    en.name:SetTextColor(qr, qg, qb)
+    en.b1.run, en.b2.run = nil, nil
+    for _, r in ipairs(en.rows) do r:Hide() end
+
+    if e.enchSlot then
+        en.meta:SetText((SLOT_NAMES[e.slot] or "?") .. "  ·  " .. CharName(e.key) .. "  ·  |cffffd140" .. L["no enchant yet"] .. "|r")
+        en.label1:SetText(L["YOUR GUILD CAN DO"])
+        local opts = {}
+        for _, x in ipairs(e.enchants) do opts[#opts + 1] = { enchant = x.id, keys = x.keys } end
+        for _, k in ipairs(e.kits) do opts[#opts + 1] = { kit = k.itemID, keys = k.keys } end
+        for i, r in ipairs(en.rows) do
+            local o = opts[i]
+            if o then
+                local label = o.enchant and ns.EnchantName(o.enchant)
+                    or ("|cffffd140" .. L["Armor kit"] .. ":|r " .. ((ns.ItemData(o.kit) or {}).name or "…"))
+                r.text:SetText(label .. "  |cff8f96a8– " .. ns.ShortName(o.keys[1]) .. (#o.keys > 1 and (" +" .. (#o.keys - 1)) or "") .. "|r")
+                r.link = o.kit and ("item:" .. o.kit) or (o.enchant and ("enchant:" .. o.enchant)) or nil
+                r.sel:SetShown(i == en.opt)
+                r:Show()
+            end
+        end
+        local o = opts[en.opt] or opts[1]
+        en.label2:SetText(o and L["WHO CAN DO IT"] or "")
+        en.text2:SetText(o and CrafterNames(o.keys) or "")
+        en.hint:SetText(#opts > #en.rows and string.format(L["+%d more"], #opts - #en.rows) or "")
+        local first = o and o.keys and o.keys[1]
+        if first and not IsMine(first) then
+            en.b2.label:SetText(string.format(L["Whisper %s"], ns.ShortName(first)))
+            en.b2.run = function()
+                local what = o.enchant and ns.EnchantName(o.enchant) or ItemLinkOrName(o.kit)
+                Whisper(first, ns.Subst(o.enchant and L["Hi! Could you enchant my {slot} with {what}? I'll bring the mats."]
+                    or L["Hi! Could you make me {what}? I'll bring the mats."], { slot = SLOT_NAMES[e.slot] or "", what = what }))
+            end
+        else
+            en.b2.label:SetText(first and L["You can do it yourself"] or L["Whisper"])
+        end
+        en.b1.label:SetText(L["Link in chat"])
+        en.b1.run = function() LinkInChat(e.itemID) end
+    else
+        local m = {}
+        for _, id in ipairs(e.yield.mats) do m[#m + 1] = ItemLinkOrName(id) end
+        en.meta:SetText(string.format(L["Disenchants into (estimate): %s"], table.concat(m, ", ")))
+        en.label1:SetText(L["ENCHANTERS IN YOUR GUILD"])
+        local list = ns.Enchanters()
+        local best
+        for i, r in ipairs(en.rows) do
+            local x = list[i]
+            if x then
+                local ok = x.rank == 0 or x.rank >= e.yield.skill
+                r.text:SetText(CharName(x.key) .. "  " .. (x.rank > 0 and (ok and "|cff5cdb6b" or "|cffff6060") .. x.rank .. "|r" or "|cff8f96a8?|r"))
+                r.link = nil
+                r.sel:SetShown(false)
+                r:Show()
+                if ok and not best and not IsMine(x.key) then best = x.key end
+            end
+        end
+        if #list == 0 then
+            en.rows[1].text:SetText("|cff8f96a8" .. L["No enchanter known yet."] .. "|r")
+            en.rows[1].sel:SetShown(false)
+            en.rows[1]:Show()
+        end
+        en.label2:SetText(L["WHO NEEDS THESE MATS"])
+        local t = {}
+        for i, n in ipairs(e.needs) do
+            if i > 6 then break end
+            local who = n.who == "stock" and L["Guild stock"] or ns.ShortName(n.who)
+            local md = ns.ItemData(n.mat)
+            t[#t + 1] = string.format("%s: %dx %s", who, n.n, md and md.name or "?")
+        end
+        en.text2:SetText(#t > 0 and table.concat(t, "\n") or ("|cff8f96a8" .. L["Nobody right now – the mats can still go to the guild bank."] .. "|r"))
+        if e.wearer then
+            en.hint:SetText("|cffff8fc8" .. string.format(L["%s could wear this – maybe give it to them instead!"], ns.ShortName(e.wearer.key)) .. "|r")
+            en.b1.label:SetText(string.format(L["Offer to %s"], ns.ShortName(e.wearer.key)))
+            en.b1.run = function()
+                Whisper(e.wearer.key, ns.Subst(L["Hi! I have {item} – it would be an upgrade for you. Want it?"], { item = e.link or ItemLinkOrName(e.itemID) }))
+                ns.LogHelp("offer", e.wearer.key, e.itemID)
+            end
+        else
+            en.hint:SetText(e.bound and L["Soulbound – only you can disenchant it."] or "")
+            en.b1.label:SetText(L["Link in chat"])
+            en.b1.run = function() LinkInChat(e.itemID) end
+        end
+        if best then
+            en.b2.label:SetText(string.format(L["Offer to %s"], ns.ShortName(best)))
+            en.b2.run = function()
+                local who = e.needs[1] and (e.needs[1].who == "stock" and L["the guild stock"] or ns.ShortName(e.needs[1].who)) or L["the guild"]
+                Whisper(best, ns.Subst(L["Hi! I have {item} I don't need. Want to disenchant it? The mats could go to {who}."],
+                    { item = e.link or ItemLinkOrName(e.itemID), who = who }))
+                ns.LogHelp("offer", best, e.itemID)
+            end
+        else
+            en.b2.label:SetText(L["Whisper"])
+        end
+    end
+    en.b1:SetActive(en.b1.run ~= nil)
+    en.b2:SetActive(en.b2.run ~= nil)
 end
 
 local function CreateSettingsView(parent)
@@ -2583,6 +2846,7 @@ local function RenderRequest(e)
             or L["You don't have any of these mats. Maybe someone else in your guild can help."])
         rq.act.label:SetText(L["Whisper: I can help"])
         rq.act.run = function()
+            ns.LogHelp("offer", r.from, r.item)
             Whisper(r.from, ns.Subst(L["Hi! I saw your Friendsmith request for {item}. I can help with: {mats}"],
                 { item = ItemLinkOrName(r.item), mats = #have > 0 and table.concat(have, ", ") or L["some of it"] }), r.sender)
         end
@@ -2592,7 +2856,7 @@ end
 
 function RenderDetail()
     if not detail then return end
-    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide(); sk:Hide(); ph:Hide(); fv:Hide(); stv:Hide(); hp:Hide()
+    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide(); sk:Hide(); ph:Hide(); fv:Hide(); stv:Hide(); hp:Hide(); en:Hide()
     if showSettings then
         stv:Show()
         local prof = stv.tab == "profile"
@@ -2602,6 +2866,11 @@ function RenderDetail()
             local on = (i == 2) == prof
             b.bg:SetColorTexture(on and C.accentBtn[1] or C.panel2[1], on and C.accentBtn[2] or C.panel2[2], on and C.accentBtn[3] or C.panel2[3], 1)
         end
+        return
+    end
+    if selEntry and (selEntry.enchSlot or selEntry.deItem) then
+        en:Show()
+        RenderEnch(selEntry)
         return
     end
     if selEntry and selEntry.helper then
@@ -2649,6 +2918,7 @@ local function CreateDetail()
     CreateFeedView(detail)
     CreateSettingsView(detail)
     CreateHelperView(detail)
+    CreateEnchView(detail)
 end
 
 ---------------------------------------------------------------------------
@@ -2800,6 +3070,8 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.OpenUI("helpers")
     elseif msg == "profile" or msg == "profil" then
         ns.OpenSettings(true, "profile")
+    elseif msg == "enchanting" or msg == "ench" or msg == "verzaubern" then
+        ns.OpenUI("ench")
     elseif msg == "feed" then
         ns.OpenUI("feed")
     elseif msg == "milestones" or msg == "meilensteine" then
@@ -2840,6 +3112,7 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.Print(L["/fsmith tradethanks – thank-you prompt after trades on/off"])
         ns.Print(L["/fsmith settings – open the settings"])
         ns.Print(L["/fsmith helpers – who is happy to help with what"])
+        ns.Print(L["/fsmith ench – enchants for your gear and spare gear to disenchant"])
         ns.Print(L["/fsmith profile – set up your helper profile"])
         ns.Print(L["/fsmith cleanup – remove old data now"])
         ns.Print(L["/fsmith stock – open the guild stock"])
