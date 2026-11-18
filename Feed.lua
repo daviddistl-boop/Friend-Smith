@@ -81,6 +81,26 @@ function ns.PostEvent(kind, a, b)
     if Add(e) then SendEvent(e) end
 end
 
+-- Neues Gildenmitglied im Feed teilen (jeder, der die Systemnachricht sieht, darf das melden;
+-- angenommen wird es nur, wenn der Name in der Gildenliste steht)
+local function InRoster(name)
+    if not GetNumGuildMembers then return false end
+    for i = 1, GetNumGuildMembers() or 0 do
+        local n = GetGuildRosterInfo(i)
+        if n and ns.SameName(n, name) then return true end
+    end
+    return false
+end
+
+local function JoinId(name) return "J:" .. (tostring(name):gsub("%-[^%-]*$", "")):lower() end
+
+function ns.PostJoin(name)
+    if not IsInGuild() or not name or not InRoster(name) then return end
+    local key = ns.PlayerKey()
+    local e = { id = JoinId(name), t = ns.Now(), kind = "join", key = key, a = name }
+    if Add(e) then SendEvent(e) end
+end
+
 -- Name oder Schluessel -> Schluessel eines bekannten Charakters
 local function ResolveKey(name)
     if not name or name == "" then return nil end
@@ -135,6 +155,15 @@ function ns.HandleFeed(kind, f, sender, channel)
     if kind ~= "E" and kind ~= "K" then return false end
     local key = f[3]
     if not key or not ns.SameName(key, sender) then return true end -- nur ueber sich selbst
+    if kind == "E" and f[5] == "join" then
+        -- Ausnahme: ein neues Mitglied melden; nur wenn es wirklich in der Gildenliste steht
+        local name, t = f[6], tonumber(f[4])
+        if channel ~= "GUILD" or not name or name == "" or #name > 48 or name:find("[;,|]") or not InRoster(name) then return true end
+        if Add({ id = JoinId(name), t = t, kind = "join", key = key, a = name }) and ns.AddNewcomer then
+            ns.AddNewcomer(name, t)
+        end
+        return true
+    end
     if kind == "E" then
         if channel ~= "GUILD" then return true end
         local t, ek = tonumber(f[4]), f[5]
@@ -191,7 +220,9 @@ function ns.FeedText(e, plain)
         return ns.Style and ns.Style.CharName(k) or ns.ShortName(k)
     end
     local item = e.a and type(e.a) == "number" and (plain and (ns.ItemData(e.a) and ns.ItemData(e.a).name) or Link(e.a))
-    if e.kind == "prof" then
+    if e.kind == "join" then
+        return ns.Subst(L["{who} is new in the guild – welcome!"], { who = ns.ShortName(e.a) })
+    elseif e.kind == "prof" then
         return ns.Subst(L["{who} reached {prof} {step}!"], { who = who(e.key), prof = e.a, step = e.b })
     elseif e.kind == "lvl" then
         return ns.Subst(L["{who} is now level {lvl}!"], { who = who(e.key), lvl = e.a })

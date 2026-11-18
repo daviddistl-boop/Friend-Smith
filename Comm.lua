@@ -176,6 +176,9 @@ local function CharPayloads(key, what)
         for _, p in ipairs(ns.ProfessionPayloads and ns.ProfessionPayloads(rec) or {}) do
             list[#list + 1] = table.concat({ PROTO, "P", key, p }, ";")
         end
+        -- Helfer-Profil (aeltere Versionen ignorieren "F")
+        local help = ns.HelpPayload and ns.HelpPayload(rec)
+        if help then list[#list + 1] = table.concat({ PROTO, "F", key, help }, ";") end
     end
     local digest
     if what == nil then
@@ -391,6 +394,8 @@ function ns.HandlePayload(sender, payload, channel)
         if f[10] and f[10]:match("^%x+$") then rec.digest = f[10] end
     elseif kind == "P" then
         if ns.ParseProfession then ns.ParseProfession(rec, f) end
+    elseif kind == "F" then
+        if ns.ParseHelp then ns.ParseHelp(rec, f) end
     elseif kind == "R" then
         local s = {}
         for id in (f[4] or ""):gmatch("%d+") do s[tonumber(id)] = true end

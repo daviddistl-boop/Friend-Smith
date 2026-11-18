@@ -378,6 +378,7 @@ function ns.UpdateSelf(levelOverride)
     rec.suffix = suffix
     if ns.DetectSpec then rec.spec = ns.DetectSpec() end
     rec.wish = ns.S.wishes or nil
+    rec.help = ns.MyHelpTopics and ns.MyHelpTopics() or nil
     rec.recipes = rec.recipes or {}
     ns.MarkDirty()
 end

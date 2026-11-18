@@ -17,6 +17,7 @@ Languages: English and German (follows your game client).
   - **For me** – who can craft something better for you or your alts?
   - **I can craft** – who can you craft something better for with your professions (your alts, guild and friends)?
   - **Guild & friends** – everything at a glance.
+  - **Helpers** – who is happy to help with what (from their helper profile), and who is new in the guild.
   - **Guild feed** – profession steps, level milestones, finished mat requests and thank-yous of your guild.
   - **Profession help** – who is leveling a profession, how many points to the next big step and which mats they need.
     With OneForAll installed, it uses OneForAll's Skill-Up Helper route and shares it with your guild.
@@ -79,6 +80,8 @@ Languages: English and German (follows your game client).
 | `/fsmith feed` | Open the guild feed |
 | `/fsmith milestones` | Share your milestones in the guild feed on/off |
 | `/fsmith tradethanks` | Thank-you prompt after trades on/off |
+| `/fsmith helpers` | Who is happy to help with what |
+| `/fsmith profile` | Set up your helper profile |
 | `/fsmith settings` | Open the settings |
 | `/fsmith cleanup` | Remove old data now |
 | `/fsmith stock` | Open the guild stock |

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.0
+- **Helper profile:** in *Settings → Helper profile* you can tick what you're happy to help with – crafting, sharing mats,
+  dungeons, quests, gathering, questions & tips or leveling together. Fixed topics only, no free text.
+- **Helpers view:** shows who in your guild and among your friends is happy to help with what – online players first.
+  One click opens a friendly whisper that fits the topic, so asking feels less awkward.
+- **Welcome for newcomers:** when someone joins the guild, Friendsmith notices it, shares it in the guild feed and lists
+  them under *New in the guild* with a *Whisper welcome* button. The overview reminds you to say hello.
+- If you're new in a guild yourself, the overview welcomes you for a week and shows who is happy to help.
+- New commands: `/fsmith helpers` and `/fsmith profile`.
+
 ## 0.12.0
 - **Settings:** all switches moved from the sidebar into a settings page (*Settings* button above *Sync*,
   `/fsmith settings`, or *Options → AddOns → Friendsmith*). The new switches for milestones, login hints and the

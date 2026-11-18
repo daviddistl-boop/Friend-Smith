@@ -301,6 +301,8 @@ local selKey, selEntry
 local showSettings = false
 local counts = { all = 0, mine = 0, help = 0, food = 0, requests = 0, stock = 0, profs = 0, feed = 0 }
 local feedEntries = {}
+local helperGroups = {}
+local rosterCache = {}
 local profEntries = {}
 local stockEntries = {}
 local reqEntries = {}
@@ -314,6 +316,7 @@ local function EntryKey(e)
     if e.stock then return "stock#" .. e.itemID end
     if e.prof then return "prof#" .. e.key .. ":" .. e.name end
     if e.feedEntry then return "feed#" .. e.f.id end
+    if e.helper then return "helper#" .. (e.topic or "new") .. ":" .. e.key end
     return e.target .. "#" .. e.itemID
 end
 
@@ -327,7 +330,10 @@ local function Matches(e)
     if query == "" then return true end
     local d = ns.ItemData(e.itemID)
     if d and d.name:lower():find(query, 1, true) then return true end
-    if e.feedEntry then
+    if e.helper then
+        return ns.ShortName(e.key):lower():find(query, 1, true) ~= nil
+            or (e.topic and ns.TopicLabel(e.topic):lower():find(query, 1, true) ~= nil) or false
+    elseif e.feedEntry then
         return ns.FeedText(e.f, true):lower():find(query, 1, true) ~= nil
     elseif e.prof then
         if e.name:lower():find(query, 1, true) then return true end
@@ -390,6 +396,37 @@ function Rebuild()
         if selKey and EntryKey(e) == selKey then selEntry = e end
     end
     counts.requests = #reqEntries
+    -- Helfer und neue Mitglieder
+    helperGroups = {}
+    counts.helpers = 0
+    local byTopic, roster = ns.HelperList()
+    rosterCache = roster or {}
+    local newbies = ns.NewcomerList(rosterCache)
+    if #newbies > 0 then
+        local items = {}
+        for _, n in ipairs(newbies) do
+            items[#items + 1] = { helper = true, newcomer = true, key = n.key, name = n.name, online = n.online, level = n.level, t = n.t, crafters = {} }
+        end
+        helperGroups[#helperGroups + 1] = { ck = "helpers:new", label = L["New in the guild"], items = items }
+    end
+    local seen = {}
+    for _, t in ipairs(ns.HELP_TOPICS) do
+        local list = byTopic[t]
+        if list and #list > 0 then
+            local items = {}
+            for _, h in ipairs(list) do
+                items[#items + 1] = { helper = true, topic = t, key = h.key, online = h.online, level = h.level, crafters = {} }
+                if not seen[h.key] then seen[h.key] = true; counts.helpers = counts.helpers + 1 end
+            end
+            helperGroups[#helperGroups + 1] = { ck = "helpers:" .. t, label = ns.TopicLabel(t), items = items }
+        end
+    end
+    for _, g in ipairs(helperGroups) do
+        for _, e in ipairs(g.items) do
+            if selKey and EntryKey(e) == selKey then selEntry = e end
+        end
+    end
+
     feedEntries = {}
     counts.feed = 0
     for _, f in ipairs(ns.FeedEntries()) do
@@ -412,7 +449,7 @@ function Rebuild()
     if not selEntry then selKey = nil end
 
     local groups, order = {}, {}
-    local grouped = view ~= "food" and view ~= "requests" and view ~= "stock" and view ~= "profs" and view ~= "feed"
+    local grouped = view ~= "food" and view ~= "requests" and view ~= "stock" and view ~= "profs" and view ~= "feed" and view ~= "helpers"
     for _, e in ipairs(grouped and results or {}) do
         if InView(e, view) and Matches(e) then
             local keys
@@ -449,6 +486,19 @@ function Rebuild()
     end
 
     wipe(flat)
+    if view == "helpers" then
+        for _, g in ipairs(helperGroups) do
+            local items = {}
+            for _, e in ipairs(g.items) do if Matches(e) then items[#items + 1] = e end end
+            if #items > 0 then
+                local closed = ns.S.collapsed[g.ck]
+                flat[#flat + 1] = { kind = "h", label = g.label, ck = g.ck, n = #items, closed = closed }
+                if not closed then
+                    for _, e in ipairs(items) do flat[#flat + 1] = { kind = "i", e = e } end
+                end
+            end
+        end
+    end
     if view == "feed" then
         -- nach Tagen gruppiert, neueste zuerst
         local today = date("%Y%m%d", time())
@@ -518,6 +568,8 @@ function Rebuild()
     if #flat == 0 then
         if query ~= "" then
             list.empty:SetText(string.format(L["Nothing found for \"%s\"."], query))
+        elseif view == "helpers" then
+            list.empty:SetText(L["Nobody has set up a helper profile yet.\n\nTell your guild what you're happy to help with:\nSettings → Helper profile."])
         elseif view == "feed" then
             list.empty:SetText(L["Nothing in the guild feed yet.\n\nProfession steps, level milestones, finished\nmat requests and thank-yous show up here."])
         elseif view == "profs" then
@@ -613,9 +665,19 @@ function RenderList()
                 r.icon:SetTexture(d and d.icon or EMPTY_ICON)
                 r.name:SetText(d and d.name or L["Loading …"])
                 r.name:SetTextColor(QualityColor(d and d.quality))
-                if e.feedEntry then
+                if e.helper then
+                    r.icon:SetTexture(e.newcomer and "Interface\\Icons\\INV_Misc_Gift_01" or "Interface\\Icons\\Spell_Holy_Heal")
+                    r.name:SetText(Rec(e.key) and CharName(e.key) or ns.ShortName(e.name or e.key))
+                    r.name:SetTextColor(1, 1, 1)
+                    if e.online then
+                        r.meta:SetText("|cff5cdb6b" .. L["online"] .. "|r")
+                    else
+                        r.meta:SetText(e.level and (L["Level "] .. e.level) or "")
+                    end
+                    r.gain:SetText(e.newcomer and ("|cff8f96a8" .. AgeText(e.t) .. "|r") or "")
+                elseif e.feedEntry then
                     local icons = { prof = "Interface\\Icons\\INV_Misc_Note_02", lvl = "Interface\\Icons\\Spell_Holy_Heal",
-                                    req = "Interface\\Icons\\INV_Misc_Bag_10", thanks = "Interface\\Icons\\INV_ValentinesCard02" }
+                                    req = "Interface\\Icons\\INV_Misc_Bag_10", join = "Interface\\Icons\\INV_Misc_Gift_01", thanks = "Interface\\Icons\\INV_ValentinesCard02" }
                     if not (d and (e.f.kind == "req")) then r.icon:SetTexture(icons[e.f.kind] or EMPTY_ICON) end
                     r.name:SetText(ns.FeedText(e.f))
                     r.name:SetTextColor(1, 1, 1)
@@ -775,6 +837,7 @@ local NAV = {
     { view = "stock", label = L["Guild stock"], icon = "Interface\\Icons\\INV_Box_01" },
     { view = "profs", label = L["Profession help"], icon = "Interface\\Icons\\INV_Misc_Note_02" },
     { view = "feed", label = L["Guild feed"], icon = "Interface\\Icons\\INV_Scroll_03" },
+    { view = "helpers", label = L["Helpers"], icon = "Interface\\Icons\\Spell_Holy_Heal" },
 }
 
 local function CreateSidebar()
@@ -821,6 +884,7 @@ local function CreateSidebar()
     AddTooltip(sidebar.nav[1], L["For me"], L["Who can craft something better for you or your alts?"])
     AddTooltip(sidebar.nav[2], L["I can craft"], L["Who you can craft something better for with your professions – your alts and your guild."])
     AddTooltip(sidebar.nav[3], L["Guild & friends"], L["Everything anyone in your guild or among your friends can craft for anyone."])
+    AddTooltip(sidebar.nav[9], L["Helpers"], L["Who is happy to help with what – and who is new in the guild."])
     AddTooltip(sidebar.nav[8], L["Guild feed"], L["Nice moments in your guild: profession steps, level milestones, finished mat requests and thank-yous."])
     AddTooltip(sidebar.nav[7], L["Profession help"], L["Who is leveling a profession and which mats they need for the next big step."])
     AddTooltip(sidebar.nav[6], L["Guild stock"], L["Minimum amounts for the guild bank – what's missing, who can craft it and which mats are needed."])
@@ -884,6 +948,19 @@ local function ShowStockTooltip(owner, e)
 end
 
 local function ShowEntryTooltip(owner, e)
+    if e.helper then
+        GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(Rec(e.key) and CharName(e.key) or ns.ShortName(e.name or e.key), 1, 1, 1)
+        if e.newcomer then GameTooltip:AddLine(string.format(L["New in the guild (%s ago)"], AgeText(e.t)), 1, 0.82, 0.25) end
+        local r = Rec(e.key)
+        if r and r.help then
+            local t = {}
+            for _, k in ipairs(ns.HELP_TOPICS) do if r.help[k] then t[#t + 1] = ns.TopicLabel(k) end end
+            GameTooltip:AddLine(L["Happy to help with: "] .. table.concat(t, ", "), 1, 0.56, 0.78, true)
+        end
+        GameTooltip:Show()
+        return
+    end
     if e.feedEntry then
         GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
         GameTooltip:AddLine(ns.FeedText(e.f), 1, 1, 1, true)
@@ -1167,7 +1244,7 @@ end
 ---------------------------------------------------------------------------
 -- Detailbereich
 ---------------------------------------------------------------------------
-local ov, it, fd, rq, sk, ph, fv, stv -- Uebersicht / Gegenstand / Essen / Mats-Gesuch / Gildenlager / Berufshilfe / Feed / Einstellungen
+local ov, it, fd, rq, sk, ph, fv, stv, hp -- ... / Einstellungen / Helfer
 
 -- Zutatenliste: "4x Dunkles Leder   du 3 · Bank 6  fehlt 1"
 local function CreateMatsBlock(parent, top, title)
@@ -1377,6 +1454,17 @@ local function RenderOverview()
         add(string.format(L["You can craft %d upgrades"], counts.help), L["For your alts and your guild – click here for the list."],
             function() SetView("help") end)
     end
+    if ns.IsWelcomePeriod() then
+        add("|cffffd140" .. string.format(L["Welcome to <%s>!"], GetGuildInfo("player") or "?") .. "|r",
+            string.format(counts.helpers == 1 and L["%d member is happy to help – see who helps with what."]
+                or L["%d members are happy to help – see who helps with what."], counts.helpers), function() SetView("helpers") end)
+    end
+    local newbies = helperGroups[1] and helperGroups[1].ck == "helpers:new" and helperGroups[1].items or {}
+    if #newbies > 0 then
+        local n = newbies[1]
+        add("|cffffd140" .. string.format(L["New in the guild: %s"], ns.ShortName(n.name or n.key)) .. "|r" .. (#newbies > 1 and ("  +" .. (#newbies - 1)) or ""),
+            L["Say hello – a short welcome helps a lot."], function() SetView("helpers") end)
+    end
     local latest = feedEntries[1]
     if latest and ns.Now() - latest.f.t < 2 * 86400 then
         add(L["Guild feed"], ns.FeedText(latest.f, true), function() SetView("feed") end)
@@ -1405,6 +1493,10 @@ local function RenderOverview()
         add(L["Record recipes"], L["Open each profession window of this character once (filters off)."])
     else
         add(string.format(L["%d recipes recorded"], myRecipes), L["Learned new recipes? Just open the profession window."])
+    end
+    if not ns.MyHelpTopics() and IsInGuild() then
+        add(L["Happy to help others?"], L["Set up your helper profile – it shows your guild what you can help with."],
+            function() ns.OpenSettings(true, "profile") end)
     end
     if ns.pending then add(L["Loading item data …"], L["Some items aren't cached yet, almost done."]) end
 
@@ -2164,7 +2256,10 @@ local function RenderFeed(e)
     fv.age:SetText(string.format(L["%s ago"], AgeText(f.t)))
     local mine = IsMine(f.key)
     fv.act.run, fv.thx.run = nil, nil
-    if not mine and (f.kind == "prof" or f.kind == "lvl" or f.kind == "req") then
+    if f.kind == "join" then
+        fv.act.label:SetText(L["Whisper welcome"])
+        fv.act.run = function() Whisper(f.a, L["Welcome to the guild! If you need anything, just ask – we're happy to help."]) end
+    elseif not mine and (f.kind == "prof" or f.kind == "lvl" or f.kind == "req") then
         fv.act.label:SetText(L["Whisper congratulations"])
         fv.act.run = function()
             Whisper(f.key, ns.Subst(L["Congratulations: {what}"], { what = ns.FeedText(f, true) }))
@@ -2177,13 +2272,103 @@ local function RenderFeed(e)
     end
     fv.act:SetActive(fv.act.run ~= nil)
     -- jemandem aus dem Eintrag danken (z. B. dem, der Mats geschickt hat)
-    if not mine and f.kind ~= "thanks" then
+    if not mine and f.kind ~= "thanks" and f.kind ~= "join" then
         fv.thx.label:SetText(string.format(L["Thank %s"], ns.ShortName(f.key)))
         fv.thx.run = function() ns.Thank(f.key) end
     else
         fv.thx.label:SetText(L["Thanks!"])
     end
     fv.thx:SetActive(fv.thx.run ~= nil)
+end
+
+local WHISPER_FOR = {
+    crafting = "Hi! Friendsmith says you're happy to craft for others. Could you help me with something?",
+    mats = "Hi! Friendsmith says you're happy to share mats. Could you spare some?",
+    dungeons = "Hi! Friendsmith says you're happy to run dungeons. Would you have time to join me sometime?",
+    quests = "Hi! Friendsmith says you're happy to help with quests. Could you help me with one?",
+    gathering = "Hi! Friendsmith says you're happy to gather. Could you help me find some materials?",
+    questions = "Hi! Friendsmith says you're happy to answer questions. May I ask you something?",
+    leveling = "Hi! Friendsmith says you'd like to level together. Want to team up sometime?",
+}
+
+local function CreateHelperView(parent)
+    hp = CreateFrame("Frame", nil, parent)
+    hp:SetAllPoints()
+    local back = CreateFrame("Button", nil, hp)
+    back:SetSize(90, 18)
+    back:SetPoint("TOPRIGHT", -14, -12)
+    local bt = Text(back, 10, C.muted, "RIGHT")
+    bt:SetPoint("RIGHT")
+    bt:SetText(L["< Overview"])
+    back:SetScript("OnEnter", function() bt:SetTextColor(1, 1, 1) end)
+    back:SetScript("OnLeave", function() bt:SetTextColor(C.muted[1], C.muted[2], C.muted[3]) end)
+    back:SetScript("OnClick", function() Select(nil) end)
+    hp.title = Text(hp, 16, C.text)
+    hp.title:SetPoint("TOPLEFT", 18, -36)
+    hp.sub = Text(hp, 11, C.muted)
+    hp.sub:SetPoint("TOPLEFT", hp.title, "BOTTOMLEFT", 0, -6)
+    hp.sub:SetPoint("RIGHT", -18, 0)
+    local l1 = SectionLabel(hp, L["HAPPY TO HELP WITH"])
+    l1:SetPoint("TOPLEFT", 18, -92)
+    hp.topics = Text(hp, 12, C.text)
+    hp.topics:SetPoint("TOPLEFT", 18, -108)
+    hp.topics:SetPoint("RIGHT", -18, 0)
+    if hp.topics.SetWordWrap then hp.topics:SetWordWrap(true) end
+    local l2 = SectionLabel(hp, L["PROFESSIONS"])
+    l2:SetPoint("TOPLEFT", 18, -190)
+    hp.profs = Text(hp, 12, C.text)
+    hp.profs:SetPoint("TOPLEFT", 18, -206)
+    hp.profs:SetPoint("RIGHT", -18, 0)
+    if hp.profs.SetWordWrap then hp.profs:SetWordWrap(true) end
+    hp.hint = Text(hp, 11, C.muted)
+    hp.hint:SetPoint("TOPLEFT", 18, -300)
+    hp.hint:SetPoint("RIGHT", -18, 0)
+    if hp.hint.SetWordWrap then hp.hint:SetWordWrap(true) end
+    hp.thx = MakeButton(hp, 100, 26, L["Thanks!"])
+    hp.thx:SetPoint("BOTTOMLEFT", 18, 14)
+    hp.thx:SetScript("OnClick", function(self) if self.key then ns.Thank(self.key) end end)
+    hp.act = MakeButton(hp, 170, 26, L["Whisper"], true)
+    hp.act:SetPoint("BOTTOMRIGHT", -18, 14)
+    hp.act:SetScript("OnClick", function(self) if self.run then self.run() end end)
+end
+
+local function RenderHelper(e)
+    local r = Rec(e.key)
+    hp.title:SetText(r and CharName(e.key) or ns.ShortName(e.name or e.key))
+    local info = ns.RosterInfo(rosterCache, e.key)
+    local parts = {}
+    local lvl = (info and info.level) or (r and r.level)
+    if lvl then parts[#parts + 1] = L["Level "] .. lvl end
+    parts[#parts + 1] = (info and info.online) and ("|cff5cdb6b" .. L["online"] .. "|r") or L["offline"]
+    if r then parts[#parts + 1] = Tag(e.key) end
+    if e.newcomer then parts[#parts + 1] = "|cffffd140" .. string.format(L["new since %s"], AgeText(e.t)) .. "|r" end
+    hp.sub:SetText(table.concat(parts, "  ·  "))
+
+    local t = {}
+    for _, k in ipairs(ns.HELP_TOPICS) do
+        if r and r.help and r.help[k] then t[#t + 1] = "|cffff8fc8•|r " .. ns.TopicLabel(k) end
+    end
+    hp.topics:SetText(#t > 0 and table.concat(t, "\n") or ("|cff8f96a8" .. L["No helper profile."] .. "|r"))
+    local pr = {}
+    for name, p in pairs(r and r.profs or {}) do pr[#pr + 1] = name .. "  |cff8f96a8" .. p.rank .. "/" .. p.max .. "|r" end
+    table.sort(pr)
+    hp.profs:SetText(#pr > 0 and table.concat(pr, "\n") or ("|cff8f96a8" .. L["Unknown (no Friendsmith or profession window not opened yet)."] .. "|r"))
+
+    hp.thx.key = e.key
+    hp.thx:SetShown(not e.newcomer and not IsMine(e.key))
+    hp.act.run = nil
+    if e.newcomer then
+        hp.hint:SetText(L["Say hello! New members often don't dare to ask – a short welcome helps a lot."])
+        hp.act.label:SetText(L["Whisper welcome"])
+        hp.act.run = function() Whisper(e.key, L["Welcome to the guild! If you need anything, just ask – we're happy to help."], e.name) end
+    else
+        hp.hint:SetText(e.topic and string.format(L["%s is happy to help with: %s. Don't be shy – just ask!"], ns.ShortName(e.key), ns.TopicLabel(e.topic)) or "")
+        hp.act.label:SetText(L["Whisper"])
+        if not IsMine(e.key) then
+            hp.act.run = function() Whisper(e.key, L[WHISPER_FOR[e.topic] or WHISPER_FOR.questions]) end
+        end
+    end
+    hp.act:SetActive(hp.act.run ~= nil)
 end
 
 local function CreateSettingsView(parent)
@@ -2203,12 +2388,15 @@ local function CreateSettingsView(parent)
     back:SetScript("OnClick", function() ns.OpenSettings(false) end)
 
     stv.toggles = {}
+    local page = CreateFrame("Frame", nil, stv)
+    page:SetAllPoints()
+    stv.general = page
     local function section(text, y)
-        local l = SectionLabel(stv, text)
+        local l = SectionLabel(page, text)
         l:SetPoint("TOPLEFT", 18, y)
     end
     local function toggle(label, y, get, set, tipTitle, tip)
-        local t = MakeToggle(stv, label, get, set)
+        local t = MakeToggle(page, label, get, set)
         t:SetPoint("TOPLEFT", 18, y)
         t:SetPoint("RIGHT", -18, 0)
         if tip then AddTooltip(t, tipTitle or label, tip) end
@@ -2228,15 +2416,15 @@ local function CreateSettingsView(parent)
     toggle(L["Lower armor types"], -108, function() return ns.S.anyArmor end,
         function(v) ns.S.anyArmor = v; ns.MarkDirty() end, L["Lower armor classes"],
         L["E.g. also suggests leather to a warrior, not just the best armor type."])
-    local dl = Text(stv, 11, C.text)
+    local dl = Text(page, 11, C.text)
     dl:SetPoint("TOPLEFT", 18, -134)
     dl:SetText(L["Min. better"])
-    local plus = MakeButton(stv, 20, 20, "+")
+    local plus = MakeButton(page, 20, 20, "+")
     plus:SetPoint("TOPLEFT", 200, -130)
-    stv.diffValue = Text(stv, 11, C.green, "CENTER")
+    stv.diffValue = Text(page, 11, C.green, "CENTER")
     stv.diffValue:SetWidth(30)
     stv.diffValue:SetPoint("RIGHT", plus, "LEFT", -2, 0)
-    local minus = MakeButton(stv, 20, 20, "-")
+    local minus = MakeButton(page, 20, 20, "-")
     minus:SetPoint("RIGHT", stv.diffValue, "LEFT", -2, 0)
     plus:SetScript("OnClick", function() ns.S.minDiff = math.min(30, ns.S.minDiff + 1); ns.MarkDirty(); Rebuild() end)
     minus:SetScript("OnClick", function() ns.S.minDiff = math.max(1, ns.S.minDiff - 1); ns.MarkDirty(); Rebuild() end)
@@ -2268,20 +2456,53 @@ local function CreateSettingsView(parent)
         function(v) ns.S.tradeThanks = v end)
 
     section(L["DATA"], -398)
-    local clean = MakeButton(stv, 150, 24, L["Clean up now"])
+    local clean = MakeButton(page, 150, 24, L["Clean up now"])
     clean:SetPoint("TOPLEFT", 18, -414)
     clean:SetScript("OnClick", function() if ns.Cleanup then ns.Cleanup(true) end end)
     AddTooltip(clean, L["Clean up now"], L["Removes old data: characters who left the guild or haven't been seen for a long time, old feed entries, expired requests and unused mats lists. Happens automatically after login, too."])
-    local reset = MakeButton(stv, 150, 24, L["Delete others' data"])
+    local reset = MakeButton(page, 150, 24, L["Delete others' data"])
     reset:SetPoint("LEFT", clean, "RIGHT", 8, 0)
     reset:SetScript("OnClick", function() SlashCmdList.FRIENDSMITH("reset") end)
     AddTooltip(reset, L["Delete others' data"], L["Deletes everything Friendsmith knows about other players. Your own characters are kept. It comes back with the next sync."])
+
+    -- Reiter 2: Helfer-Profil
+    local prof = CreateFrame("Frame", nil, stv)
+    prof:SetAllPoints()
+    stv.profile = prof
+    local pl = SectionLabel(prof, L["I'M HAPPY TO HELP WITH"])
+    pl:SetPoint("TOPLEFT", 18, -48)
+    local intro = Text(prof, 10, C.muted)
+    intro:SetPoint("TOPLEFT", 18, -62)
+    intro:SetPoint("RIGHT", -18, 0)
+    if intro.SetWordWrap then intro:SetWordWrap(true) end
+    intro:SetText(L["Your guild and friends see this in the Helpers view – so people who don't like to ask know whom they can turn to. Nobody gets a message."])
+    for i, t in ipairs(ns.HELP_TOPICS) do
+        local tg = MakeToggle(prof, ns.TopicLabel(t),
+            function() return ns.S.helpTopics and ns.S.helpTopics[t] or false end,
+            function(v) ns.SetHelpTopic(t, v) end)
+        tg:SetPoint("TOPLEFT", 18, -104 - (i - 1) * 24)
+        tg:SetPoint("RIGHT", -18, 0)
+        stv.toggles[#stv.toggles + 1] = tg
+    end
+    prof:Hide()
+
+    -- Reiterknoepfe
+    local function tab(label, x, w, show)
+        local b = MakeButton(stv, w, 20, label)
+        b:SetPoint("TOPLEFT", x, -14)
+        b.label:SetFont(FONT, 10, "")
+        b:SetScript("OnClick", function() stv.tab = show; ns.OpenSettings(true) end)
+        return b
+    end
+    stv.tabs = { tab(L["General"], 120, 70, "general"), tab(L["Helper profile"], 194, 96, "profile") }
+    stv.tab = "general"
     stv:Hide()
 end
 
 -- Einstellungen im Fenster zeigen/verstecken
-function ns.OpenSettings(on)
+function ns.OpenSettings(on, tab)
     if not f then CreateUI() end
+    if tab and stv then stv.tab = tab end
     showSettings = on and true or false
     if showSettings then selKey, selEntry = nil, nil end
     if not f:IsShown() then f:Show() else Rebuild() end
@@ -2371,9 +2592,21 @@ end
 
 function RenderDetail()
     if not detail then return end
-    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide(); sk:Hide(); ph:Hide(); fv:Hide(); stv:Hide()
+    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide(); sk:Hide(); ph:Hide(); fv:Hide(); stv:Hide(); hp:Hide()
     if showSettings then
         stv:Show()
+        local prof = stv.tab == "profile"
+        stv.general:SetShown(not prof)
+        stv.profile:SetShown(prof)
+        for i, b in ipairs(stv.tabs) do
+            local on = (i == 2) == prof
+            b.bg:SetColorTexture(on and C.accentBtn[1] or C.panel2[1], on and C.accentBtn[2] or C.panel2[2], on and C.accentBtn[3] or C.panel2[3], 1)
+        end
+        return
+    end
+    if selEntry and selEntry.helper then
+        hp:Show()
+        RenderHelper(selEntry)
         return
     end
     if selEntry and selEntry.feedEntry then
@@ -2415,6 +2648,7 @@ local function CreateDetail()
     CreateProfView(detail)
     CreateFeedView(detail)
     CreateSettingsView(detail)
+    CreateHelperView(detail)
 end
 
 ---------------------------------------------------------------------------
@@ -2562,6 +2796,10 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.OpenSettings(true)
     elseif msg == "cleanup" or msg == "aufraeumen" or msg == "aufräumen" then
         if ns.Cleanup then ns.Cleanup(true) end
+    elseif msg == "helpers" or msg == "helfer" then
+        ns.OpenUI("helpers")
+    elseif msg == "profile" or msg == "profil" then
+        ns.OpenSettings(true, "profile")
     elseif msg == "feed" then
         ns.OpenUI("feed")
     elseif msg == "milestones" or msg == "meilensteine" then
@@ -2601,6 +2839,8 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.Print(L["/fsmith milestones – share your milestones on/off"])
         ns.Print(L["/fsmith tradethanks – thank-you prompt after trades on/off"])
         ns.Print(L["/fsmith settings – open the settings"])
+        ns.Print(L["/fsmith helpers – who is happy to help with what"])
+        ns.Print(L["/fsmith profile – set up your helper profile"])
         ns.Print(L["/fsmith cleanup – remove old data now"])
         ns.Print(L["/fsmith stock – open the guild stock"])
         ns.Print(L["/fsmith target [item] 40 – set a stock target (0 removes it)"])
