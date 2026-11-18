@@ -125,6 +125,7 @@ function ns.ReagentPayload(rec)
         end
     end
     if #parts == 0 then return nil end
+    table.sort(parts)
     return table.concat(parts, ",")
 end
 

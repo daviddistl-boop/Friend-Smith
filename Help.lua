@@ -166,7 +166,11 @@ end
 ---------------------------------------------------------------------------
 function ns.ProfessionPayloads(rec)
     local out = {}
-    for name, p in pairs(rec.profs or {}) do
+    local names = {}
+    for name in pairs(rec.profs or {}) do names[#names + 1] = name end
+    table.sort(names)
+    for _, name in ipairs(names) do
+        local p = rec.profs[name]
         local c = {}
         for _, x in ipairs(p.cands) do c[#c + 1] = x[1] .. ":" .. x[2] end
         local g = {}

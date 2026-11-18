@@ -11,7 +11,7 @@ Languages: English and German (follows your game client).
 - Remembers the equipped gear and all learned gear recipes of every one of your characters.
 - Shares this data invisibly with everyone in your guild who also runs Friendsmith.
 - **Friends:** also syncs with people on your friend list who use Friendsmith, even outside your guild.
-  Data is only accepted from people on your own friend list. Turn it off with *Share with friends* in the sidebar.
+  Data is only accepted from people on your own friend list. Turn it off with *Share with friends* in the settings.
 - Works out which craftable items are better than what each character is currently wearing.
 - Shows the results in a window (`/fsmith`) with three views:
   - **For me** – who can craft something better for you or your alts?
@@ -29,13 +29,13 @@ Languages: English and German (follows your game client).
 - **Upgrades next to your profession window**, in the same style as the profession window: "Upgrades for you", "Upgrades for &lt;alt&gt;" and "Upgrades for &lt;guildmate&gt;" from the profession you have open.
   In the cooking window it lists your buff food by category instead – gold means nobody you know cooks anything better.
   Click to open the recipe, right-click to show it in the Friendsmith window.
-  Drag the panel by its header, or turn it off in the window's sidebar.
+  Drag the panel by its header, or turn it off in the settings.
 - **Mats:** the details of an upgrade list the mats it needs – how many you have (bags and bank of all your characters),
   how many are in the guild bank and what's missing. *Ask for mats* creates a request your guild sees in Friendsmith
   and prepares a guild chat message – nothing is sent until you press Enter.
 - **Guild bank:** when someone with Friendsmith opens the guild bank, the tabs they can see are shared with the guild.
   It's a snapshot, so the window shows how old it is.
-- **Silent wishes:** tick *Happy about help* and Friendsmith asks for you – your guild sees what it could craft for you
+- **Silent wishes:** tick *Happy about help* in the settings and Friendsmith asks for you – your guild sees what it could craft for you
   or which mats you need, without you having to ask. Helpers get a short hint after login (only in their own chat).
 - **Say thanks:** one click thanks someone for their help – from the guild feed, next to a crafter, or right after a trade.
   It shows up in the guild feed and they get a short note.
@@ -79,6 +79,8 @@ Languages: English and German (follows your game client).
 | `/fsmith feed` | Open the guild feed |
 | `/fsmith milestones` | Share your milestones in the guild feed on/off |
 | `/fsmith tradethanks` | Thank-you prompt after trades on/off |
+| `/fsmith settings` | Open the settings |
+| `/fsmith cleanup` | Remove old data now |
 | `/fsmith stock` | Open the guild stock |
 | `/fsmith target [item] 40` | Set a stock target, officers only (0 removes it) |
 | `/fsmith debug` | Show incoming Friendsmith messages in chat (on/off) |

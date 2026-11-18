@@ -17,6 +17,7 @@ local queue, buffers = {}, {}
 local lastBroadcast = 0
 local counter = 0
 local lastFriendHello, lastFriendAnswer = {}, {}
+local wanted, lastAnswered = {}, {}
 
 local function NewId()
     counter = counter + 1
@@ -134,32 +135,64 @@ local function Pump()
     end
 end
 
-local function SendCharTo(key, what, channel, target)
+-- Kurze Pruefsumme (32 Bit) – damit andere erkennen, ob sie unsere Daten schon kennen
+local function Hash(str)
+    local h = 5381
+    for i = 1, #str do h = (h * 33 + str:byte(i)) % 4294967296 end
+    return string.format("%08x", h)
+end
+
+local function sortedPairsList(t, fmt)
+    local keys = {}
+    for k in pairs(t or {}) do keys[#keys + 1] = k end
+    table.sort(keys)
+    local out = {}
+    for _, k in ipairs(keys) do out[#out + 1] = fmt(k, t[k]) end
+    return out
+end
+
+-- Alle Nachrichten zu einem eigenen Charakter, immer in derselben Reihenfolge.
+-- Ergebnis: Liste von Nutzdaten, Pruefsumme ueber alles
+local function CharPayloads(key, what)
     local rec = FriendsmithDB.chars[key]
-    if not rec then return end
+    if not rec then return {}, nil end
+    local list = {}
+    local gIndex
     if what ~= "R" then
-        local parts = {}
-        for slot, id in pairs(rec.gear or {}) do parts[#parts + 1] = slot .. ":" .. id end
-        local sfx = {}
-        for slot, v in pairs(rec.suffix or {}) do sfx[#sfx + 1] = slot .. ":" .. v end
-        -- Felder 7 (Spec) und 8 (Zufallseigenschaften) ignorieren aeltere Versionen einfach
-        Enqueue(table.concat({ PROTO, "G", key, rec.class or "", tostring(rec.level or 0), table.concat(parts, ","),
-            tostring(rec.spec or 0), table.concat(sfx, ","), rec.wish and "1" or "0" }, ";"), channel, target)
+        local parts = sortedPairsList(rec.gear, function(slot, id) return slot .. ":" .. id end)
+        local sfx = sortedPairsList(rec.suffix, function(slot, v) return slot .. ":" .. v end)
+        -- Felder 7 (Spec), 8 (Zufallseigenschaften), 9 (Wunsch), 10 (Pruefsumme) ignorieren aeltere Versionen
+        list[#list + 1] = table.concat({ PROTO, "G", key, rec.class or "", tostring(rec.level or 0), table.concat(parts, ","),
+            tostring(rec.spec or 0), table.concat(sfx, ","), rec.wish and "1" or "0" }, ";")
+        gIndex = #list
     end
     if what ~= "G" then
-        local ids = {}
-        for id in pairs(rec.recipes or {}) do ids[#ids + 1] = id end
-        if #ids > 0 then
-            Enqueue(table.concat({ PROTO, "R", key, table.concat(ids, ",") }, ";"), channel, target)
-        end
+        local ids = sortedPairsList(rec.recipes, function(id) return tostring(id) end)
+        if #ids > 0 then list[#list + 1] = table.concat({ PROTO, "R", key, table.concat(ids, ",") }, ";") end
         -- Zutaten der Rezepte (aeltere Versionen ignorieren "M")
         local mats = ns.ReagentPayload and ns.ReagentPayload(rec)
-        if mats then Enqueue(table.concat({ PROTO, "M", key, mats }, ";"), channel, target) end
+        if mats then list[#list + 1] = table.concat({ PROTO, "M", key, mats }, ";") end
         -- Fertigkeit und Levelvorschlaege je Beruf (Berufshilfe)
         for _, p in ipairs(ns.ProfessionPayloads and ns.ProfessionPayloads(rec) or {}) do
-            Enqueue(table.concat({ PROTO, "P", key, p }, ";"), channel, target)
+            list[#list + 1] = table.concat({ PROTO, "P", key, p }, ";")
         end
     end
+    local digest
+    if what == nil then
+        digest = Hash(table.concat(list, "\n"))
+        if gIndex then list[gIndex] = list[gIndex] .. ";" .. digest end
+    end
+    return list, digest
+end
+
+function ns.CharDigest(key)
+    local _, d = CharPayloads(key, nil)
+    return d
+end
+
+local function SendCharTo(key, what, channel, target)
+    local list = CharPayloads(key, what)
+    for _, p in ipairs(list) do Enqueue(p, channel, target) end
 end
 
 local function OnlineFriends()
@@ -169,6 +202,33 @@ local function OnlineFriends()
         if online then list[#list + 1] = name end
     end
     return list
+end
+
+-- Gesuche, Gildenbank, Lagerziele, Feed: nur eigene Eintraege, hoechstens alle 2 Minuten
+local lastExtras = -1000
+local function BroadcastExtras()
+    if not IsInGuild() or GetTime() - lastExtras < 120 then return end
+    lastExtras = GetTime()
+    if ns.BroadcastExtra then ns.BroadcastExtra() end
+    if ns.BroadcastStock then ns.BroadcastStock() end
+    if ns.BroadcastFeed then ns.BroadcastFeed() end
+end
+
+-- Pruefsummen der eigenen Charaktere in der Gilde ("H"): andere fragen gezielt nach, was ihnen fehlt
+local lastDigest = -1000
+local function SendDigest(force)
+    if not IsInGuild() then return end
+    if not force and GetTime() - lastDigest < 30 then return end
+    lastDigest = GetTime()
+    local myGuild = GetGuildInfo("player")
+    local parts = {}
+    for key, rec in pairs(FriendsmithDB.chars) do
+        if rec.mine and rec.guild == myGuild then
+            local d = ns.CharDigest(key)
+            if d then parts[#parts + 1] = key .. "=" .. d end
+        end
+    end
+    if #parts > 0 then Enqueue(table.concat({ PROTO, "H", table.concat(parts, ",") }, ";"), "GUILD") end
 end
 
 -- Daten eines eigenen Charakters an die Gilde und an alle Online-Freunde senden
@@ -190,9 +250,8 @@ function ns.BroadcastAll()
     for key, rec in pairs(FriendsmithDB.chars) do
         if rec.mine and rec.guild == myGuild then SendCharTo(key, nil, "GUILD") end
     end
-    if ns.BroadcastExtra then ns.BroadcastExtra() end
-    if ns.BroadcastStock then ns.BroadcastStock() end
-    if ns.BroadcastFeed then ns.BroadcastFeed() end
+    lastExtras = -1000
+    BroadcastExtras()
 end
 
 -- Alle eigenen Charaktere an einen Freund.
@@ -215,8 +274,14 @@ end
 function ns.Hello(force)
     ns.UpdateSelf()
     if IsInGuild() then
-        Enqueue(PROTO .. ";Q", "GUILD")
-        ns.BroadcastAll()
+        -- "Q;2": neue Versionen antworten nur mit Pruefsummen, aeltere mit allen Daten
+        Enqueue(PROTO .. ";Q;2", "GUILD")
+        if force then
+            ns.BroadcastAll()
+        else
+            SendDigest(true)
+            BroadcastExtras()
+        end
     end
     for _, name in ipairs(OnlineFriends()) do HelloFriend(name, force) end
 end
@@ -233,7 +298,10 @@ function ns.HandlePayload(sender, payload, channel)
 
     if kind == "Q" then
         if channel == "GUILD" then
-            if GetTime() - lastBroadcast > 120 then
+            if f[3] == "2" then
+                -- neue Version: kurze Pruefsummen statt aller Daten
+                ns.Debounce("answer", math.random(2, 10), function() SendDigest(false); BroadcastExtras() end)
+            elseif GetTime() - lastBroadcast > 120 then
                 ns.Debounce("answer", math.random(5, 25), ns.BroadcastAll)
             end
         else
@@ -242,6 +310,43 @@ function ns.HandlePayload(sender, payload, channel)
             if who and (not lastFriendAnswer[who] or now - lastFriendAnswer[who] > 60) then
                 lastFriendAnswer[who] = now
                 ns.Debounce("answer:" .. who, math.random(2, 6), function() SendMineTo(who) end)
+            end
+        end
+        return
+    end
+
+    if kind == "H" then
+        if channel ~= "GUILD" then return end
+        local DB = FriendsmithDB
+        for key, d in (f[3] or ""):gmatch("([^,=]+)=(%x+)") do
+            local rec = DB.chars[key]
+            if not (rec and rec.mine) and (not rec or rec.digest ~= d) then
+                wanted[key] = true
+            end
+        end
+        if next(wanted) then
+            ns.Debounce("want", math.random(2, 5), function()
+                local keys = {}
+                for k in pairs(wanted) do
+                    if #keys < 20 then keys[#keys + 1] = k end
+                end
+                wipe(wanted)
+                Enqueue(table.concat({ PROTO, "N", table.concat(keys, ",") }, ";"), "GUILD")
+            end)
+        end
+        return
+    elseif kind == "N" then
+        if channel ~= "GUILD" then return end
+        local DB = FriendsmithDB
+        local myGuild = GetGuildInfo("player")
+        for key in (f[3] or ""):gmatch("[^,]+") do
+            local rec = DB.chars[key]
+            if rec and rec.mine and rec.guild == myGuild then
+                local now = GetTime()
+                if not lastAnswered[key] or now - lastAnswered[key] > 60 then
+                    lastAnswered[key] = now
+                    ns.Debounce("need:" .. key, math.random(1, 4), function() SendCharTo(key, nil, "GUILD") end)
+                end
             end
         end
         return
@@ -283,6 +388,7 @@ function ns.HandlePayload(sender, payload, channel)
         end
         rec.suffix = sfx
         rec.wish = (f[9] == "1") or nil -- "freut sich ueber Hilfe"
+        if f[10] and f[10]:match("^%x+$") then rec.digest = f[10] end
     elseif kind == "P" then
         if ns.ParseProfession then ns.ParseProfession(rec, f) end
     elseif kind == "R" then

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0
+- **Settings:** all switches moved from the sidebar into a settings page (*Settings* button above *Sync*,
+  `/fsmith settings`, or *Options → AddOns → Friendsmith*). The new switches for milestones, login hints and the
+  thank-you prompt after trades are there too.
+- **Cleanup:** shortly after login Friendsmith removes old data – characters who left the guild or haven't been seen for
+  60 days, old feed entries, expired requests and mats lists nobody needs anymore. Also available as *Clean up now* and `/fsmith cleanup`.
+- **Leaner sync:** on login, Friendsmith only sends a short checksum per character. Guild members ask for the full data
+  only if theirs is out of date, instead of everyone resending everything. The *Sync* button still sends everything.
+  Older Friendsmith versions in the guild keep working.
+
 ## 0.11.0
 - **Guild feed:** a new view with the nice moments of your guild – profession steps (75/150/225/300), level milestones,
   finished mat requests and thank-yous. Everyone sees that people in the guild help each other.

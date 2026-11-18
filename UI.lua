@@ -298,6 +298,7 @@ local rows, flat = {}, {}
 local offset, numRows = 0, 0
 local view, groupBy, query = "mine", "target", ""
 local selKey, selEntry
+local showSettings = false
 local counts = { all = 0, mine = 0, help = 0, food = 0, requests = 0, stock = 0, profs = 0, feed = 0 }
 local feedEntries = {}
 local profEntries = {}
@@ -305,7 +306,7 @@ local stockEntries = {}
 local reqEntries = {}
 local foodGroups = {}
 
-local Rebuild, RenderList, RenderDetail
+local Rebuild, RenderList, RenderDetail, CreateUI
 
 local function EntryKey(e)
     if e.food then return "food#" .. e.itemID end
@@ -545,8 +546,11 @@ function Rebuild()
         nb.bar:SetShown(on)
         nb.label:SetTextColor(on and 1 or C.text[1], on and 1 or C.text[2], on and 1 or C.text[3])
     end
-    for _, t in ipairs(sidebar.toggles) do t:Update() end
-    sidebar.diffValue:SetText("+" .. ns.S.minDiff)
+    if stv then
+        for _, t in ipairs(stv.toggles) do t:Update() end
+        stv.diffValue:SetText("+" .. ns.S.minDiff)
+    end
+    sidebar.gear:SetActive(not showSettings)
 
     -- Gruppieren-Schalter
     list.groupLabel:SetShown(grouped)
@@ -668,6 +672,7 @@ local function SetOffset(v)
 end
 
 local function Select(e)
+    showSettings = false
     if e and selKey == EntryKey(e) then e = nil end
     selKey = e and EntryKey(e) or nil
     selEntry = e
@@ -677,6 +682,7 @@ end
 
 local function SetView(v)
     view = v
+    showSettings = false
     offset = 0
     Rebuild()
 end
@@ -821,72 +827,6 @@ local function CreateSidebar()
     AddTooltip(sidebar.nav[5], L["Mat requests"], L["Mats your guild is looking for right now – and whether you have some."])
     AddTooltip(sidebar.nav[4], L["Buff food"], L["Who can cook the best \"Well Fed\" food in each category – Stamina, Spirit, Agility and so on."])
 
-    local flbl = SectionLabel(sidebar, L["FILTER"])
-    flbl:SetPoint("TOPLEFT", 14, -240)
-
-    sidebar.toggles = {}
-    local t1 = MakeToggle(sidebar, L["Only my crafters"],
-        function() return ns.S.onlyMine end,
-        function(v) ns.S.onlyMine = v; ns.MarkDirty() end)
-    t1:SetPoint("TOPLEFT", 14, -256)
-    t1:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t1, L["Only my crafters"], L["Only shows upgrades you can craft with your own characters."])
-    local t2 = MakeToggle(sidebar, L["Lower armor types"],
-        function() return ns.S.anyArmor end,
-        function(v) ns.S.anyArmor = v; ns.MarkDirty() end)
-    t2:SetPoint("TOPLEFT", 14, -300)
-    t2:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t2, L["Lower armor classes"], L["E.g. also suggests leather to a warrior, not just the best armor type."])
-    local t3 = MakeToggle(sidebar, L["Profession window panel"],
-        function() return not ns.S.hideProfPanel end,
-        function(v) ns.S.hideProfPanel = (not v) or nil; if ns.RefreshProfPanel then ns.RefreshProfPanel() end end)
-    t3:SetPoint("TOPLEFT", 14, -350)
-    t3:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t3, L["Profession window panel"], L["Shows next to the profession window what you can craft with this profession, and for whom."])
-    local t4 = MakeToggle(sidebar, L["Rate by spec stats"],
-        function() return ns.S.useStats end,
-        function(v) ns.S.useStats = v; ns.MarkDirty() end)
-    t4:SetPoint("TOPLEFT", 14, -278)
-    t4:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t4, L["Rating by spec stats"],
-        L["Compares strength, agility, spell power etc., weighted by specialization "] ..
-        L["(the talent tree with the most points). Without talent points, or when turned off, only item level counts. "] ..
-        L["Can be changed per character in the details."])
-    local t5 = MakeToggle(sidebar, L["Minimap button"],
-        function() return not (ns.S.minimap and ns.S.minimap.hide) end,
-        function(v) ns.SetMinimapShown(v) end)
-    t5:SetPoint("TOPLEFT", 14, -372)
-    t5:SetPoint("RIGHT", -10, 0)
-    local t6 = MakeToggle(sidebar, L["Share with friends"],
-        function() return ns.S.shareFriends end,
-        function(v) ns.S.shareFriends = v; ns.MarkDirty(); if v then ns.Hello(true) end end)
-    t6:SetPoint("TOPLEFT", 14, -394)
-    t6:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t6, L["Share with friends"],
-        L["Also exchanges data with people on your friend list who use Friendsmith, even if they aren't in your guild. Data is only accepted from people on your own friend list."])
-    local t7 = MakeToggle(sidebar, L["Happy about help"],
-        function() return ns.S.wishes end,
-        function(v) ns.SetWishes(v); ns.Print(v and L["Silent wishes on: your guild sees where it could help you – you don't have to ask."] or L["Silent wishes off."]) end)
-    t7:SetPoint("TOPLEFT", 14, -416)
-    t7:SetPoint("RIGHT", -10, 0)
-    AddTooltip(t7, L["Happy about help"],
-        L["Friendsmith asks for you: guild members and friends see by themselves what they could craft for you or which mats you need for your profession. Nobody gets a message – they only see it in Friendsmith."])
-    sidebar.toggles = { t1, t4, t2, t3, t5, t6, t7 }
-
-    local dl = Text(sidebar, 11, C.text)
-    dl:SetPoint("TOPLEFT", 14, -326)
-    dl:SetText(L["Min. better"])
-    local plus = MakeButton(sidebar, 20, 20, "+")
-    plus:SetPoint("TOPRIGHT", -10, -322)
-    sidebar.diffValue = Text(sidebar, 11, C.green, "CENTER")
-    sidebar.diffValue:SetWidth(30)
-    sidebar.diffValue:SetPoint("RIGHT", plus, "LEFT", -2, 0)
-    local minus = MakeButton(sidebar, 20, 20, "-")
-    minus:SetPoint("RIGHT", sidebar.diffValue, "LEFT", -2, 0)
-    plus:SetScript("OnClick", function() ns.S.minDiff = math.min(30, ns.S.minDiff + 1); ns.MarkDirty(); Rebuild() end)
-    minus:SetScript("OnClick", function() ns.S.minDiff = math.max(1, ns.S.minDiff - 1); ns.MarkDirty(); Rebuild() end)
-    AddTooltip(plus, L["Minimum improvement"], L["Only counts as an upgrade from this many item levels (or percent with spec rating) better."])
-
     local sync = MakeButton(sidebar, SIDEBAR_W - 20, 28, L["Sync"], true)
     sync:SetPoint("BOTTOMLEFT", 10, 12)
     sync:SetScript("OnClick", function()
@@ -894,6 +834,10 @@ local function CreateSidebar()
         ns.Print(L["Sent your data to your guild and friends and requested theirs."])
     end)
     AddTooltip(sync, L["Sync"], L["Sends your data to your guild and online friends using Friendsmith and requests theirs."])
+    local gear = MakeButton(sidebar, SIDEBAR_W - 20, 24, L["Settings"])
+    gear:SetPoint("BOTTOMLEFT", sync, "TOPLEFT", 0, 6)
+    gear:SetScript("OnClick", function() ns.OpenSettings(true) end)
+    sidebar.gear = gear
 end
 
 ---------------------------------------------------------------------------
@@ -1223,7 +1167,7 @@ end
 ---------------------------------------------------------------------------
 -- Detailbereich
 ---------------------------------------------------------------------------
-local ov, it, fd, rq, sk, ph, fv -- Uebersicht / Gegenstand / Essen / Mats-Gesuch / Gildenlager / Berufshilfe / Feed
+local ov, it, fd, rq, sk, ph, fv, stv -- Uebersicht / Gegenstand / Essen / Mats-Gesuch / Gildenlager / Berufshilfe / Feed / Einstellungen
 
 -- Zutatenliste: "4x Dunkles Leder   du 3 · Bank 6  fehlt 1"
 local function CreateMatsBlock(parent, top, title)
@@ -2242,6 +2186,107 @@ local function RenderFeed(e)
     fv.thx:SetActive(fv.thx.run ~= nil)
 end
 
+local function CreateSettingsView(parent)
+    stv = CreateFrame("Frame", nil, parent)
+    stv:SetAllPoints()
+    local title = Text(stv, 16, C.text)
+    title:SetPoint("TOPLEFT", 18, -16)
+    title:SetText(L["Settings"])
+    local back = CreateFrame("Button", nil, stv)
+    back:SetSize(90, 18)
+    back:SetPoint("TOPRIGHT", -14, -12)
+    local bt = Text(back, 10, C.muted, "RIGHT")
+    bt:SetPoint("RIGHT")
+    bt:SetText(L["< Overview"])
+    back:SetScript("OnEnter", function() bt:SetTextColor(1, 1, 1) end)
+    back:SetScript("OnLeave", function() bt:SetTextColor(C.muted[1], C.muted[2], C.muted[3]) end)
+    back:SetScript("OnClick", function() ns.OpenSettings(false) end)
+
+    stv.toggles = {}
+    local function section(text, y)
+        local l = SectionLabel(stv, text)
+        l:SetPoint("TOPLEFT", 18, y)
+    end
+    local function toggle(label, y, get, set, tipTitle, tip)
+        local t = MakeToggle(stv, label, get, set)
+        t:SetPoint("TOPLEFT", 18, y)
+        t:SetPoint("RIGHT", -18, 0)
+        if tip then AddTooltip(t, tipTitle or label, tip) end
+        stv.toggles[#stv.toggles + 1] = t
+        return t
+    end
+
+    section(L["UPGRADES"], -48)
+    toggle(L["Only my crafters"], -64, function() return ns.S.onlyMine end,
+        function(v) ns.S.onlyMine = v; ns.MarkDirty() end,
+        nil, L["Only shows upgrades you can craft with your own characters."])
+    toggle(L["Rate by spec stats"], -86, function() return ns.S.useStats end,
+        function(v) ns.S.useStats = v; ns.MarkDirty() end, L["Rating by spec stats"],
+        L["Compares strength, agility, spell power etc., weighted by specialization "] ..
+        L["(the talent tree with the most points). Without talent points, or when turned off, only item level counts. "] ..
+        L["Can be changed per character in the details."])
+    toggle(L["Lower armor types"], -108, function() return ns.S.anyArmor end,
+        function(v) ns.S.anyArmor = v; ns.MarkDirty() end, L["Lower armor classes"],
+        L["E.g. also suggests leather to a warrior, not just the best armor type."])
+    local dl = Text(stv, 11, C.text)
+    dl:SetPoint("TOPLEFT", 18, -134)
+    dl:SetText(L["Min. better"])
+    local plus = MakeButton(stv, 20, 20, "+")
+    plus:SetPoint("TOPLEFT", 200, -130)
+    stv.diffValue = Text(stv, 11, C.green, "CENTER")
+    stv.diffValue:SetWidth(30)
+    stv.diffValue:SetPoint("RIGHT", plus, "LEFT", -2, 0)
+    local minus = MakeButton(stv, 20, 20, "-")
+    minus:SetPoint("RIGHT", stv.diffValue, "LEFT", -2, 0)
+    plus:SetScript("OnClick", function() ns.S.minDiff = math.min(30, ns.S.minDiff + 1); ns.MarkDirty(); Rebuild() end)
+    minus:SetScript("OnClick", function() ns.S.minDiff = math.max(1, ns.S.minDiff - 1); ns.MarkDirty(); Rebuild() end)
+    AddTooltip(plus, L["Minimum improvement"], L["Only counts as an upgrade from this many item levels (or percent with spec rating) better."])
+
+    section(L["WINDOW"], -166)
+    toggle(L["Profession window panel"], -182, function() return not ns.S.hideProfPanel end,
+        function(v) ns.S.hideProfPanel = (not v) or nil; if ns.RefreshProfPanel then ns.RefreshProfPanel() end end,
+        nil, L["Shows next to the profession window what you can craft with this profession, and for whom."])
+    toggle(L["Minimap button"], -204, function() return not (ns.S.minimap and ns.S.minimap.hide) end,
+        function(v) ns.SetMinimapShown(v) end)
+
+    section(L["SHARING"], -236)
+    toggle(L["Share with friends"], -252, function() return ns.S.shareFriends end,
+        function(v) ns.S.shareFriends = v; ns.MarkDirty(); if v then ns.Hello(true) end end, nil,
+        L["Also exchanges data with people on your friend list who use Friendsmith, even if they aren't in your guild. Data is only accepted from people on your own friend list."])
+    toggle(L["Happy about help"], -274, function() return ns.S.wishes end,
+        function(v) ns.SetWishes(v) end, nil,
+        L["Friendsmith asks for you: guild members and friends see by themselves what they could craft for you or which mats you need for your profession. Nobody gets a message – they only see it in Friendsmith."])
+    toggle(L["Share my milestones in the guild feed"], -296, function() return ns.S.feedEvents ~= false end,
+        function(v) ns.S.feedEvents = v end, nil,
+        L["Profession steps, level milestones and finished mat requests show up in the guild feed."])
+
+    section(L["HINTS"], -328)
+    toggle(L["Hints after login: who I could help"], -344, function() return ns.S.nudges ~= false end,
+        function(v) ns.S.nudges = v end, nil,
+        L["A few lines in your own chat after login – an upgrade you could craft or mats someone needs."])
+    toggle(L["Ask to say thanks after trades"], -366, function() return ns.S.tradeThanks ~= false end,
+        function(v) ns.S.tradeThanks = v end)
+
+    section(L["DATA"], -398)
+    local clean = MakeButton(stv, 150, 24, L["Clean up now"])
+    clean:SetPoint("TOPLEFT", 18, -414)
+    clean:SetScript("OnClick", function() if ns.Cleanup then ns.Cleanup(true) end end)
+    AddTooltip(clean, L["Clean up now"], L["Removes old data: characters who left the guild or haven't been seen for a long time, old feed entries, expired requests and unused mats lists. Happens automatically after login, too."])
+    local reset = MakeButton(stv, 150, 24, L["Delete others' data"])
+    reset:SetPoint("LEFT", clean, "RIGHT", 8, 0)
+    reset:SetScript("OnClick", function() SlashCmdList.FRIENDSMITH("reset") end)
+    AddTooltip(reset, L["Delete others' data"], L["Deletes everything Friendsmith knows about other players. Your own characters are kept. It comes back with the next sync."])
+    stv:Hide()
+end
+
+-- Einstellungen im Fenster zeigen/verstecken
+function ns.OpenSettings(on)
+    if not f then CreateUI() end
+    showSettings = on and true or false
+    if showSettings then selKey, selEntry = nil, nil end
+    if not f:IsShown() then f:Show() else Rebuild() end
+end
+
 local function CreateRequestView(parent)
     rq = CreateFrame("Frame", nil, parent)
     rq:SetAllPoints()
@@ -2326,7 +2371,11 @@ end
 
 function RenderDetail()
     if not detail then return end
-    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide(); sk:Hide(); ph:Hide(); fv:Hide()
+    ov:Hide(); it:Hide(); fd:Hide(); rq:Hide(); sk:Hide(); ph:Hide(); fv:Hide(); stv:Hide()
+    if showSettings then
+        stv:Show()
+        return
+    end
     if selEntry and selEntry.feedEntry then
         fv:Show()
         RenderFeed(selEntry)
@@ -2365,12 +2414,13 @@ local function CreateDetail()
     CreateStockView(detail)
     CreateProfView(detail)
     CreateFeedView(detail)
+    CreateSettingsView(detail)
 end
 
 ---------------------------------------------------------------------------
 -- Fenster
 ---------------------------------------------------------------------------
-local function CreateUI()
+function CreateUI()
     f = CreateFrame("Frame", "FriendsmithFrame", UIParent)
     f:SetSize(W, H)
     f:SetPoint("CENTER")
@@ -2508,6 +2558,10 @@ SlashCmdList.FRIENDSMITH = function(msg)
         if not name and UnitName then name = UnitName("target") end
         local item = ns.ParseItem and ns.ParseItem(raw:gsub("^%S+%s*", ""))
         if name then ns.Thank(name, item) else ns.Print(L["/fsmith thanks Name [item] – say thanks (or target the player)"]) end
+    elseif msg == "settings" or msg == "options" or msg == "einstellungen" then
+        ns.OpenSettings(true)
+    elseif msg == "cleanup" or msg == "aufraeumen" or msg == "aufräumen" then
+        if ns.Cleanup then ns.Cleanup(true) end
     elseif msg == "feed" then
         ns.OpenUI("feed")
     elseif msg == "milestones" or msg == "meilensteine" then
@@ -2546,10 +2600,45 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.Print(L["/fsmith feed – open the guild feed"])
         ns.Print(L["/fsmith milestones – share your milestones on/off"])
         ns.Print(L["/fsmith tradethanks – thank-you prompt after trades on/off"])
+        ns.Print(L["/fsmith settings – open the settings"])
+        ns.Print(L["/fsmith cleanup – remove old data now"])
         ns.Print(L["/fsmith stock – open the guild stock"])
         ns.Print(L["/fsmith target [item] 40 – set a stock target (0 removes it)"])
         ns.Print(L["/fsmith reset – delete other guild members' data"])
     else
         ns.ToggleUI()
+    end
+end
+
+---------------------------------------------------------------------------
+-- Eintrag im Blizzard-Menue (Optionen -> AddOns)
+---------------------------------------------------------------------------
+do
+    local panel = CreateFrame("Frame")
+    panel.name = "Friendsmith"
+    local t = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    t:SetPoint("TOPLEFT", 16, -16)
+    t:SetText("Friendsmith")
+    local d = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    d:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -8)
+    d:SetPoint("RIGHT", -16, 0)
+    d:SetJustifyH("LEFT")
+    d:SetText(L["All settings are in the Friendsmith window."])
+    local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    b:SetSize(200, 26)
+    b:SetPoint("TOPLEFT", d, "BOTTOMLEFT", 0, -12)
+    b:SetText(L["Open Friendsmith settings"])
+    b:SetScript("OnClick", function()
+        if SettingsPanel and SettingsPanel:IsShown() and HideUIPanel then HideUIPanel(SettingsPanel) end
+        if InterfaceOptionsFrame and InterfaceOptionsFrame:IsShown() and HideUIPanel then HideUIPanel(InterfaceOptionsFrame) end
+        ns.OpenSettings(true)
+    end)
+    if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
+        pcall(function()
+            local cat = Settings.RegisterCanvasLayoutCategory(panel, "Friendsmith")
+            Settings.RegisterAddOnCategory(cat)
+        end)
+    elseif InterfaceOptions_AddCategory then
+        pcall(InterfaceOptions_AddCategory, panel)
     end
 end
