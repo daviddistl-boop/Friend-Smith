@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.6
+- The spec is now also detected on WoW Forever without OneForAll: Friendsmith reads the new talent system itself and
+  assigns the talents to the three trees by their sub-tree (or position, left to right). OneForAll is still used first
+  when installed, since it knows the exact tree of every talent.
+
 ## 0.14.5
 - Fixed: the spec wasn't detected on WoW Forever (new talent system), so items were rated by item level only and
   some worse items showed up as upgrades. With OneForAll installed, Friendsmith now reads the talent points per tree

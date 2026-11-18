@@ -74,12 +74,78 @@ local SPECS = {
 -- Talentbaum mit den meisten Punkten, nil wenn noch keine Punkte verteilt sind.
 -- Talentpunkte je Baum lesen. WoW Forever nutzt das neue Talentsystem (C_ClassTalents/C_Traits);
 -- dafuer verwenden wir, falls installiert, die Auswertung von OneForAll. Sonst die klassische Abfrage.
+-- Eigene Auswertung des neuen Talentsystems (ohne OneForAll): alle Talentknoten der aktiven Konfiguration
+-- holen und auf drei Baeume verteilen – nach Teilbaum (subTreeID), sonst nach Position von links nach rechts.
+local function TraitPoints()
+    local CT, CTr = C_ClassTalents, C_Traits
+    if not (CT and CT.GetActiveConfigID and CTr and CTr.GetConfigInfo and CTr.GetTreeNodes and CTr.GetNodeInfo) then return nil end
+    local ok, configID = pcall(CT.GetActiveConfigID)
+    if not ok or not configID then return nil end
+    local okc, ci = pcall(CTr.GetConfigInfo, configID)
+    if not okc or type(ci) ~= "table" or not ci.treeIDs then return nil end
+    local nodes = {}
+    for _, treeID in ipairs(ci.treeIDs) do
+        local okn, ids = pcall(CTr.GetTreeNodes, treeID)
+        for _, nodeID in ipairs(okn and ids or {}) do
+            local oki, ni = pcall(CTr.GetNodeInfo, configID, nodeID)
+            if oki and type(ni) == "table" and ni.isVisible ~= false and ni.posX then
+                nodes[#nodes + 1] = { x = ni.posX, sub = ni.subTreeID, rank = ni.currentRank or ni.ranksPurchased or 0 }
+            end
+        end
+    end
+    if #nodes == 0 then return nil end
+
+    -- Gruppen bilden: zuerst nach Teilbaum
+    local groups, order = {}, {}
+    for _, n in ipairs(nodes) do
+        if n.sub then
+            if not groups[n.sub] then groups[n.sub] = { nodes = {}, sx = 0 }; order[#order + 1] = n.sub end
+            local g = groups[n.sub]
+            g.nodes[#g.nodes + 1] = n
+            g.sx = g.sx + n.x
+        end
+    end
+    local trees
+    if #order >= 3 then
+        local list = {}
+        for _, sid in ipairs(order) do
+            local g = groups[sid]
+            if #g.nodes >= 2 then list[#list + 1] = { x = g.sx / #g.nodes, nodes = g.nodes } end
+        end
+        if #list >= 3 then
+            -- die drei groessten Teilbaeume, von links nach rechts
+            table.sort(list, function(a, b) return #a.nodes > #b.nodes end)
+            trees = { list[1], list[2], list[3] }
+            table.sort(trees, function(a, b) return a.x < b.x end)
+        end
+    end
+    if not trees then
+        -- Rueckfall: in drei gleich breite Streifen nach x aufteilen
+        local minX, maxX = math.huge, -math.huge
+        for _, n in ipairs(nodes) do minX = math.min(minX, n.x); maxX = math.max(maxX, n.x) end
+        local span = math.max(1, maxX - minX)
+        trees = { { nodes = {} }, { nodes = {} }, { nodes = {} } }
+        for _, n in ipairs(nodes) do
+            local f = (n.x - minX) / span
+            local i = (f < 1 / 3 and 1) or (f < 2 / 3 and 2) or 3
+            table.insert(trees[i].nodes, n)
+        end
+    end
+    local pts = { 0, 0, 0 }
+    for i = 1, 3 do
+        for _, n in ipairs(trees[i].nodes) do pts[i] = pts[i] + (tonumber(n.rank) or 0) end
+    end
+    return pts
+end
+
 local function PointsPerTree()
     local o = _G.OneForAll
     if type(o) == "table" and type(o.TalentPointsPerTree) == "function" then
         local ok, pts = pcall(o.TalentPointsPerTree)
         if ok and type(pts) == "table" and ((pts[1] or 0) + (pts[2] or 0) + (pts[3] or 0)) > 0 then return pts end
     end
+    local tp = TraitPoints()
+    if tp and (tp[1] + tp[2] + tp[3]) > 0 then return tp end
     if GetNumTalentTabs and GetTalentTabInfo then
         local pts = {}
         for i = 1, (GetNumTalentTabs() or 0) do
