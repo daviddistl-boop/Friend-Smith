@@ -299,6 +299,7 @@ local offset, numRows = 0, 0
 local view, groupBy, query = "mine", "target", ""
 local selKey, selEntry
 local showSettings = false
+local lastRecipeHint
 local counts = { all = 0, mine = 0, help = 0, food = 0, requests = 0, stock = 0, profs = 0, feed = 0 }
 local feedEntries = {}
 local helperGroups = {}
@@ -1269,6 +1270,16 @@ local function CreateList()
             end
             if d and IsShiftKeyDown() then LinkInChat(it.e.itemID); return end
             Select(it.e)
+            -- kannst du es selbst herstellen? Dann zum Rezept im Berufsfenster springen
+            local me = ns.PlayerKey()
+            local canCraft = false
+            for _, k in ipairs(it.e.crafters or {}) do if k == me then canCraft = true end end
+            if canCraft and it.e.itemID and ns.OpenRecipe and not ns.OpenRecipe(it.e.itemID) then
+                if not lastRecipeHint or GetTime() - lastRecipeHint > 10 then
+                    lastRecipeHint = GetTime()
+                    ns.Print(L["Open the matching profession window – Friendsmith will jump straight to the recipe."])
+                end
+            end
         end)
         r:SetScript("OnEnter", function(self)
             local it = self.item

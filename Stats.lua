@@ -108,6 +108,15 @@ function ns.WeightsFor(key)
     return s and s[2]
 end
 
+-- Fuer Verzauberungen: Gewichte der Spezialisierung, ohne Talente die des ersten Talentbaums der Klasse
+function ns.ClassWeights(key)
+    local w = ns.WeightsFor(key)
+    if w then return w end
+    local rec = FriendsmithDB.chars[key]
+    local s = rec and SPECS[rec.class or ""]
+    return s and s[1] and s[1][2] or nil
+end
+
 function ns.SpecLabel(key)
     local i = SpecIndex(key)
     local rec = FriendsmithDB.chars[key]

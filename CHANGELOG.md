@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.4
+- *Enchanting* now shows only the best enchants for each free slot, rated for the character's class and spec
+  (e.g. Agility and Stamina for a hunter, no Spirit or Strength). Of the armor kits, only the best one the character
+  can already use is shown.
+- Clicking an item you can craft in the Friendsmith window jumps straight to its recipe in the profession window.
+  If the profession window isn't open, Friendsmith jumps there as soon as you open it.
+
 ## 0.14.3
 - Buff food now uses the categories of the cooking window ("Stamina Food", "Agility Food" …), which WoW Forever already
   sorts by buff. This works no matter how the tooltips are worded. Where the buff value isn't known, food is ranked by

@@ -149,6 +149,87 @@ function ns.EnchantName(id)
 end
 
 ---------------------------------------------------------------------------
+-- Was bringt eine Verzauberung? Wert und Menge aus der Zauberbeschreibung
+-- ("Verzaubert Armschienen dauerhaft, um Stärke um 3 zu erhöhen."), sonst aus dem Namen.
+---------------------------------------------------------------------------
+local EFFECTS = {
+    -- Reihenfolge wichtig: laengere/genauere Begriffe zuerst
+    { "ALL", { "all stats", "alle werte", "allen werten", "alle attribute" } },
+    { "HEAL", { "healing", "heilung" } },
+    { "SP", { "spell damage", "spell power", "zauberschaden", "zaubermacht" } },
+    { "AP", { "attack power", "angriffskraft" } },
+    { "STR", { "strength", "stärke" } },
+    { "AGI", { "agility", "beweglichkeit" } },
+    { "STA", { "stamina", "ausdauer" } },
+    { "INT", { "intellect", "intelligenz" } },
+    { "SPI", { "spirit", "willenskraft" } },
+    { "DEF", { "defense", "verteidigung" } },
+    { "HEALTH", { "health", "gesundheit" } },
+    { "MANA", { "mana" } },
+    { "ARMOR", { "armor", "rüstung" } },
+    { "RES", { "resistance", "widerstand" } },
+    { "DMG", { "damage", "schaden" } },
+}
+local TIERS = { { "minor", 1 }, { "lesser", 2 }, { "greater", 4 }, { "superior", 5 }, { "major", 6 },
+                { "schwach", 1 }, { "gering", 2 }, { "groß", 4 }, { "überragend", 5 }, { "Überragend", 5 }, { "erheblich", 6 } }
+
+local effectCache = {}
+local function SpellText(id)
+    local d = (C_Spell and C_Spell.GetSpellDescription and C_Spell.GetSpellDescription(id))
+        or (GetSpellDescription and GetSpellDescription(id))
+    if (not d or d == "") and C_Spell and C_Spell.RequestLoadSpellData then pcall(C_Spell.RequestLoadSpellData, id) end
+    return d
+end
+
+-- { stat = "STR", amount = 3 } oder nil
+function ns.EnchantEffect(id)
+    local c = effectCache[id]
+    if c ~= nil then return c or nil end
+    local desc = SpellText(id)
+    local name = ns.EnchantName(id)
+    local text = ((desc and desc ~= "") and desc or name or ""):lower()
+    local stat
+    for _, e in ipairs(EFFECTS) do
+        for _, w in ipairs(e[2]) do
+            if text:find(w, 1, true) then stat = e[1] break end
+        end
+        if stat then break end
+    end
+    if not stat then
+        if desc and desc ~= "" then effectCache[id] = false end
+        return nil
+    end
+    local amount = tonumber(text:match("(%d+)"))
+    local fromTier = false
+    if not amount or not (desc and desc ~= "") then
+        -- ohne Beschreibung: Stufe aus dem Namen ("Schwache/Geringe/Große …")
+        local low = (name or ""):lower()
+        amount = 3
+        for _, t in ipairs(TIERS) do if low:find(t[1], 1, true) then amount = t[2] end end
+        fromTier = true
+    end
+    c = { stat = stat, amount = amount, guess = fromTier }
+    if desc and desc ~= "" then effectCache[id] = c end -- nur mit Beschreibung endgueltig merken
+    return c
+end
+
+-- Wert einer Verzauberung fuer einen Charakter (nach Klasse/Spezialisierung)
+function ns.EnchantScore(id, key)
+    local fx = ns.EnchantEffect(id)
+    if not fx then return 0 end
+    local w = ns.ClassWeights and ns.ClassWeights(key) or {}
+    local a = fx.amount or 0
+    if fx.stat == "ALL" then
+        return a * ((w.STR or 0) + (w.AGI or 0) + (w.STA or 0) + (w.INT or 0) + (w.SPI or 0))
+    elseif fx.stat == "HEALTH" then return a / 10 * (w.STA or 0)
+    elseif fx.stat == "MANA" then return a / 15 * (w.INT or 0)
+    elseif fx.stat == "DMG" then return a * (w.DPS or 0) / 2
+    elseif fx.stat == "RES" then return a * 0.05
+    end
+    return a * (w[fx.stat] or 0)
+end
+
+---------------------------------------------------------------------------
 -- Freie Verzauberungsplaetze der eigenen Charaktere
 ---------------------------------------------------------------------------
 local function IsKit(itemID)
@@ -191,9 +272,35 @@ function ns.FreeEnchantSlots()
                         table.sort(keys)
                         e.enchants[#e.enchants + 1] = { id = id, keys = keys }
                     end
-                    table.sort(e.enchants, function(a, b) return a.id > b.id end) -- hoehere ID ~ neuere/bessere Formel
+                    -- nur die besten Verzauberungen fuer diesen Charakter (Klasse/Spezialisierung)
+                    for _, x in ipairs(e.enchants) do x.score = ns.EnchantScore(x.id, key) end
+                    table.sort(e.enchants, function(a, b)
+                        if a.score ~= b.score then return a.score > b.score end
+                        return a.id > b.id
+                    end)
+                    local top = e.enchants[1] and e.enchants[1].score or 0
+                    local keep = {}
+                    for _, x in ipairs(e.enchants) do
+                        -- Werte, die die Klasse gar nicht braucht, fallen weg; sonst das Beste (+ fast Gleichwertige)
+                        if #keep < 3 and x.score > 0 and x.score >= top * 0.85 then keep[#keep + 1] = x end
+                    end
+                    -- nichts bewertbar (z. B. "Kreuzfahrer" ohne Werte im Namen): die neueste Formel behalten
+                    if #keep == 0 and top <= 0 and e.enchants[1] then
+                        table.sort(e.enchants, function(a, b) return a.id > b.id end)
+                        keep[1] = e.enchants[1]
+                    end
+                    e.enchants = keep
                     if KIT_SLOTS[slot] then
-                        for _, k in ipairs(kits) do e.kits[#e.kits + 1] = { itemID = k[1], keys = k[2] } end
+                        -- nur das beste Ruestungsset, das der Charakter schon benutzen darf
+                        local bestKit
+                        for _, k in ipairs(kits) do
+                            local d = ns.ItemData(k[1])
+                            if d and (d.req or 0) <= (rec.level or 1) and (not bestKit or (d.req or 0) > bestKit.req
+                                or ((d.req or 0) == bestKit.req and (d.ilvl or 0) > bestKit.ilvl)) then
+                                bestKit = { itemID = k[1], keys = k[2], req = d.req or 0, ilvl = d.ilvl or 0 }
+                            end
+                        end
+                        if bestKit then e.kits[1] = bestKit end
                     end
                     if #e.enchants > 0 or #e.kits > 0 then out[#out + 1] = e end
                 end

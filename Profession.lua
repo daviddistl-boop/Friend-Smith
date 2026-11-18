@@ -370,6 +370,30 @@ local function Create(host)
     Place(host)
 end
 
+-- Aus dem Friendsmith-Fenster: Rezept im offenen Berufsfenster auswaehlen.
+-- Ist der passende Beruf nicht offen, merken wir uns das Rezept und springen beim naechsten Oeffnen hin.
+local pendingRecipe
+function ns.OpenRecipe(itemID)
+    local map = Host() and ns.CurrentRecipes()
+    if map and map[itemID] then
+        pendingRecipe = nil
+        SelectRecipe(itemID)
+        return true
+    end
+    pendingRecipe = itemID
+    return false
+end
+
+local function TryPending()
+    if not pendingRecipe then return end
+    local map = ns.CurrentRecipes()
+    if map and map[pendingRecipe] then
+        local id = pendingRecipe
+        pendingRecipe = nil
+        SelectRecipe(id)
+    end
+end
+
 function ns.OnTradeSkillShow()
     local host = Host()
     if not host or not ns.Style then return end
@@ -381,4 +405,5 @@ function ns.OnTradeSkillShow()
     end
     offset = 0
     C_Timer.After(0.3, ns.RefreshProfPanel)
+    C_Timer.After(0.5, TryPending)
 end

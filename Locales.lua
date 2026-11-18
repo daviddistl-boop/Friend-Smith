@@ -16,6 +16,7 @@ local LOCALE = GetLocale and GetLocale() or "enUS"
 if FriendsmithLocaleOverride then LOCALE = FriendsmithLocaleOverride end
 
 if LOCALE == "deDE" then
+    L["Open the matching profession window – Friendsmith will jump straight to the recipe."] = "Öffne das passende Berufsfenster – Friendsmith springt dann direkt zum Rezept."
     L["From the cooking window: %d recipes in buff food categories."] = "Aus dem Kochfenster: %d Rezepte in Buff-Essen-Kategorien."
     L["lvl"] = "Stufe"
     L["Best %s food you can get (%s)"] = "Bestes %s-Essen, das es gibt (%s)"
