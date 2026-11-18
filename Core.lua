@@ -71,7 +71,7 @@ function ns.ItemData(itemID)
     if not itemID then return nil end
     local c = infoCache[itemID]
     if c then return c end
-    local name, link, quality, ilvl, reqLevel, typeName, subName, _, equipLoc, icon, _, classID, subclassID, bindType = GetItemInfo(itemID)
+    local name, link, quality, ilvl, reqLevel, typeName, subName, _, equipLoc, icon, _, classID, subclassID, bindType, _, setID = GetItemInfo(itemID)
     if not name then
         if RequestLoad then RequestLoad(itemID) end
         ns.pending = true
@@ -83,6 +83,7 @@ function ns.ItemData(itemID)
         class = classID, sub = subclassID,
         typeName = typeName, subName = subName,
         bop = (bindType == 1), -- beim Aufheben gebunden: nur fuer den Handwerker selbst
+        setID = (setID and setID ~= 0) and setID or nil, -- Teil eines Sets
     }
     infoCache[itemID] = c
     return c
@@ -214,6 +215,9 @@ local function Evaluate(key, rec, itemID)
             end
             local diff = d.ilvl - curIlvl
             local r = { slot = slot, cur = cur, diff = diff }
+            -- traegt der Charakter ein Set-Teil? Dann geht womoeglich ein Setbonus verloren
+            local cdata = cur and ns.ItemData(cur)
+            r.setLoss = cdata and cdata.setID and cdata.setID ~= d.setID or nil
             if w then
                 r.mode = "stat"
                 if cur and curScore > 0 then
@@ -225,6 +229,8 @@ local function Evaluate(key, rec, itemID)
             else
                 r.rank = diff
             end
+            -- fuer einen moeglichen Setbonus-Verlust muss das neue Teil deutlich besser sein
+            if r.setLoss then r.rank = r.rank - (r.mode == "stat" and 15 or 5) end
             if not best or r.rank > best.rank then best = r end
         end
     end
@@ -299,7 +305,7 @@ function ns.Compute()
                     if DB.chars[ck].mine then mine = true end
                 end
                 all[#all + 1] = {
-                    target = tk, itemID = itemID, slot = r.slot,
+                    target = tk, itemID = itemID, slot = r.slot, setLoss = r.setLoss,
                     cur = r.cur, diff = r.diff, pct = r.pct, mode = r.mode, rank = r.rank,
                     crafters = crafters, mineCraft = mine,
                 }

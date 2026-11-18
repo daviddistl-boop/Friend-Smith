@@ -72,17 +72,41 @@ local SPECS = {
 -- Spezialisierung
 ---------------------------------------------------------------------------
 -- Talentbaum mit den meisten Punkten, nil wenn noch keine Punkte verteilt sind.
-function ns.DetectSpec()
-    if not GetNumTalentTabs or not GetTalentTabInfo then return nil end
-    local best, bestPts = nil, 0
-    for i = 1, (GetNumTalentTabs() or 0) do
-        local r = { GetTalentTabInfo(i) }
-        -- alter Client: name, icon, punkte, ... / neuer Client: id, name, beschreibung, icon, punkte, ...
-        local pts = (type(r[1]) == "string") and r[3] or r[5]
-        pts = tonumber(pts) or 0
-        if pts > bestPts then best, bestPts = i, pts end
+-- Talentpunkte je Baum lesen. WoW Forever nutzt das neue Talentsystem (C_ClassTalents/C_Traits);
+-- dafuer verwenden wir, falls installiert, die Auswertung von OneForAll. Sonst die klassische Abfrage.
+local function PointsPerTree()
+    local o = _G.OneForAll
+    if type(o) == "table" and type(o.TalentPointsPerTree) == "function" then
+        local ok, pts = pcall(o.TalentPointsPerTree)
+        if ok and type(pts) == "table" and ((pts[1] or 0) + (pts[2] or 0) + (pts[3] or 0)) > 0 then return pts end
     end
-    return best
+    if GetNumTalentTabs and GetTalentTabInfo then
+        local pts = {}
+        for i = 1, (GetNumTalentTabs() or 0) do
+            local r = { GetTalentTabInfo(i) }
+            -- alter Client: name, icon, punkte, ... / neuer Client: id, name, beschreibung, icon, punkte, ...
+            local p = (type(r[1]) == "string") and r[3] or r[5]
+            pts[i] = tonumber(p) or 0
+        end
+        return pts
+    end
+end
+
+function ns.DetectSpec()
+    local pts = PointsPerTree()
+    local best, bestPts = nil, 0
+    for i = 1, 3 do
+        local p = pts and pts[i] or 0
+        if p > bestPts then best, bestPts = i, p end
+    end
+    if best then return best end
+    -- Talentsystem mit gewaehlter Spezialisierung (falls vorhanden)
+    local gs = (C_SpecializationInfo and C_SpecializationInfo.GetSpecialization) or GetSpecialization
+    if gs then
+        local ok, i = pcall(gs)
+        if ok and type(i) == "number" and i >= 1 and i <= 3 then return i end
+    end
+    return nil
 end
 
 -- Auswahl je Charakter: nil = automatisch, 0 = Itemlevel, 1-3 = fester Talentbaum
@@ -101,8 +125,19 @@ local function SpecIndex(key)
     return rec.spec
 end
 
+-- Ohne erkannte Talente: typischer Leveling-Baum der Klasse statt reinem Itemlevel
+-- (Paladin Vergeltung, Schamane Verstaerkung, Druide Wilder Kampf, Priester Schatten, sonst Baum 1)
+local DEFAULT_TREE = { PALADIN = 3, SHAMAN = 2, DRUID = 2, PRIEST = 3 }
+
+local function DefaultIndex(key)
+    local rec = FriendsmithDB.chars[key]
+    if not rec or not SPECS[rec.class or ""] then return nil end
+    if Override(key) ~= nil or not ns.S.useStats then return nil end
+    return DEFAULT_TREE[rec.class] or 1
+end
+
 function ns.WeightsFor(key)
-    local i = SpecIndex(key)
+    local i = SpecIndex(key) or DefaultIndex(key)
     if not i then return nil end
     local s = SPECS[FriendsmithDB.chars[key].class][i]
     return s and s[2]
@@ -123,6 +158,10 @@ function ns.SpecLabel(key)
     local name = i and rec and SPECS[rec.class] and SPECS[rec.class][i] and SPECS[rec.class][i][1]
     local o = Override(key)
     if name then return name .. (o and L[" (manual)"] or "") end
+    local d = DefaultIndex(key)
+    if d and rec and SPECS[rec.class] then
+        return string.format(L["%s (class default – no talents found)"], SPECS[rec.class][d][1])
+    end
     if o == 0 then return L["Item level (manual)"] end
     if not ns.S.useStats then return L["Item level"] end
     return L["Item level (no talents)"]

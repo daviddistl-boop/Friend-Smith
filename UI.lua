@@ -1067,6 +1067,7 @@ local function ShowEntryTooltip(owner, e)
         GameTooltip:AddLine(L["Slot is empty"], 1, 1, 1)
     end
     GameTooltip:AddLine(L["Improvement: "] .. GainText(e) .. "  (" .. ns.SpecLabel(e.target) .. ")", 0.36, 0.86, 0.42)
+    if e.setLoss then GameTooltip:AddLine(L["set bonus lost"], 1, 0.4, 0.4) end
     local tr = Rec(e.target)
     local diffs = ns.StatDiffText(ns.ItemStats(e.itemID), e.cur and ns.ItemStats(e.cur, tr and tr.suffix and tr.suffix[e.slot]), ns.WeightsFor(e.target))
     if diffs ~= "" then GameTooltip:AddLine(diffs, 1, 1, 1, true) end
@@ -1789,7 +1790,7 @@ local function RenderItem(e)
     local w = ns.WeightsFor(e.target)
     local tr = Rec(e.target)
     local diffs = ns.StatDiffText(ns.ItemStats(e.itemID), e.cur and ns.ItemStats(e.cur, tr and tr.suffix and tr.suffix[e.slot]), w)
-    it.statLine:SetText(diffs ~= "" and diffs or L["No known stat differences"])
+    it.statLine:SetText((diffs ~= "" and diffs or L["No known stat differences"]) .. (e.setLoss and ("  |cffff6666" .. L["set bonus lost"] .. "|r") or ""))
 
     for i, r in ipairs(it.crafters) do
         local k = e.crafters[i]

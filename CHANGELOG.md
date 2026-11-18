@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.5
+- Fixed: the spec wasn't detected on WoW Forever (new talent system), so items were rated by item level only and
+  some worse items showed up as upgrades. With OneForAll installed, Friendsmith now reads the talent points per tree
+  the same way OneForAll does.
+- Without detected talents, items are no longer rated by item level alone but by the class's usual leveling tree
+  (e.g. Retribution for paladins, Enhancement for shamans, Feral for druids, Shadow for priests).
+- If you wear part of an item set, a new item has to be clearly better before it's suggested ("set bonus lost" is shown).
+
 ## 0.14.4
 - *Enchanting* now shows only the best enchants for each free slot, rated for the character's class and spec
   (e.g. Agility and Stamina for a hunter, no Spirit or Strength). Of the armor kits, only the best one the character
