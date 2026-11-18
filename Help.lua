@@ -75,6 +75,12 @@ local function OFA()
 end
 ns.HasOneForAll = function() return OFA() ~= nil end
 
+-- Einstellungen von OneForAll, die die Route beeinflussen
+local function OfaSignature()
+    local sdb = type(OneForAllDB) == "table" and type(OneForAllDB.skillUp) == "table" and OneForAllDB.skillUp or {}
+    return (sdb.ah ~= false and "a" or "-") .. (sdb.vendor ~= false and "v" or "-") .. (sdb.noAlts and "n" or "-")
+end
+
 -- englischer Berufsname von OneForAll fuer unseren (lokalisierten) Namen
 local function OfaProf(o, name, map)
     local key = type(o.ProfKey) == "function" and select(2, pcall(o.ProfKey, name)) or name
@@ -94,7 +100,11 @@ local function GuideFromOFA(name, rank, target, map)
     if not o or target <= rank then return nil end
     local prof = OfaProf(o, name, map)
     if not prof then return nil end
-    local ok, plan = pcall(o.SkillUp.Plan, prof, { from = rank, to = target })
+    -- dieselben Einstellungen wie im Skill-Up-Helfer von OneForAll ("Muster aus dem AH / von Haendlern"),
+    -- damit die Route gleich ist und OneForAll seine gespeicherte Route wiederverwendet
+    local sdb = type(OneForAllDB) == "table" and type(OneForAllDB.skillUp) == "table" and OneForAllDB.skillUp or {}
+    local opts = { from = rank, to = target, ah = sdb.ah ~= false, vendor = sdb.vendor ~= false }
+    local ok, plan = pcall(o.SkillUp.Plan, prof, opts)
     if not ok or type(plan) ~= "table" or type(plan.steps) ~= "table" then return nil end
     local guide = {}
     local d = FriendsmithDB
@@ -151,13 +161,16 @@ function ns.RecordProfession(map, rec)
     end
     -- Route von OneForAll nur neu rechnen, wenn sich die Fertigkeit geaendert hat (der Planer ist nicht billig)
     local guide = old and old.guide
-    if changed or not guide or (old and old.guideFor ~= rank) then
+    -- neu rechnen bei neuer Fertigkeit, geaenderten OneForAll-Einstellungen oder nach 30 Minuten (Preise)
+    local sig = OfaSignature()
+    if changed or not guide or (old and (old.guideFor ~= rank or old.guideSig ~= sig or ns.Now() - (old.guideT or 0) > 1800)) then
         local plan = ns.ProfPlan({ rank = rank, max = max or MAX_SKILL, cands = {} })
         local target = plan and plan.next or rank
         guide = GuideFromOFA(name, rank, target, map)
         if guide then changed = true end
     end
-    rec.profs[name] = { rank = rank, max = max or MAX_SKILL, t = ns.Now(), cands = cands, guide = guide, guideFor = guide and rank or nil }
+    rec.profs[name] = { rank = rank, max = max or MAX_SKILL, t = ns.Now(), cands = cands, guide = guide, guideFor = guide and rank or nil,
+        guideSig = guide and sig or nil, guideT = guide and ns.Now() or nil }
     return changed
 end
 

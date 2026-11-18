@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.2
+- Fixed: the OneForAll leveling route in *Profession help* differed from OneForAll's own Skill-Up Helper.
+  Friendsmith now uses the same settings (patterns from the auction house / from vendors), so it shows the same route.
+  The route is also recalculated when those settings change and every 30 minutes (auction prices).
+
 ## 0.14.1
 - Fixed: buff food wasn't recognized on some clients ("none of your cooking recipes gives Well Fed").
   The "Well Fed" name is now looked up when needed instead of at login, colored tooltip lines are handled,
