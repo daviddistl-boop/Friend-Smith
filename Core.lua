@@ -348,6 +348,27 @@ function ns.Compute()
     return results
 end
 
+-- "Ich kann craften": pro Spieler und Ausruestungsplatz nur das beste Teil, das ein eigener Charakter herstellen kann.
+-- Ergebnis: Menge der Eintraege { [eintrag] = true }. filter(e) kann die Auswahl weiter einschraenken.
+function ns.BestCraftable(results, filter)
+    local best = {}
+    local DB = FriendsmithDB
+    for _, e in ipairs(results or {}) do
+        local mine = false
+        for _, k in ipairs(e.crafters) do
+            if DB.chars[k] and DB.chars[k].mine then mine = true break end
+        end
+        if mine and (not filter or filter(e)) then
+            local k = e.target .. "#" .. e.slot
+            local b = best[k]
+            if not b or e.rank > b.rank or (e.rank == b.rank and e.itemID < b.itemID) then best[k] = e end
+        end
+    end
+    local set = {}
+    for _, e in pairs(best) do set[e] = true end
+    return set
+end
+
 function ns.GetResults()
     if ns.dirty or not ns.results then
         if InCombatLockdown() and ns.results then return ns.results end
@@ -493,6 +514,7 @@ function ns.ScanRecipes(verbose)
     local newMats = ns.RecordReagents and ns.RecordReagents(map, rec) or 0
     local profChanged = ns.RecordProfession and ns.RecordProfession(map, rec) or false
     if ns.RecordEnchants and ns.RecordEnchants(rec) then profChanged = true end
+    if ns.RecordFoodCategories and ns.RecordFoodCategories(rec) then profChanged = true end
 
     if added > 0 or newMats > 0 or profChanged then
         ns.MarkDirty()

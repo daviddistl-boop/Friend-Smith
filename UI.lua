@@ -323,9 +323,11 @@ local function EntryKey(e)
     return e.target .. "#" .. e.itemID
 end
 
+local bestHelp = {} -- "Ich kann craften": nur das beste Teil je Spieler und Platz
+
 local function InView(e, v)
     if v == "mine" then return IsMine(e.target) end
-    if v == "help" then return AnyMine(e.crafters) end
+    if v == "help" then return bestHelp[e] == true end
     return true
 end
 
@@ -381,6 +383,7 @@ function Rebuild()
     ns.S.collapsed = ns.S.collapsed or {}
 
     counts.all, counts.mine, counts.help = #results, 0, 0
+    bestHelp = ns.BestCraftable(results)
     selEntry = nil
     for _, e in ipairs(results) do
         if InView(e, "mine") then counts.mine = counts.mine + 1 end
@@ -747,7 +750,7 @@ function RenderList()
                 elseif e.food then
                     local more = #e.crafters > 1 and (" +" .. (#e.crafters - 1)) or ""
                     r.meta:SetText(CharName(e.crafters[1]) .. more)
-                    r.gain:SetText((e.rank == 1 and "|cffffd140" or "") .. "+" .. e.amount)
+                    r.gain:SetText((e.rank == 1 and "|cffffd140" or "") .. ns.FoodValueText(e))
                 elseif groupBy == "crafter" then
                     r.meta:SetText(CharName(e.target))
                     r.gain:SetText(DiffText(e))
@@ -954,10 +957,10 @@ local function ShowFoodTooltip(owner, e)
     GameTooltip:SetHyperlink("item:" .. e.itemID)
     GameTooltip:AddLine(" ")
     if e.rank == 1 then
-        GameTooltip:AddLine(string.format(L["Best %s food you can get (+%d)"], e.label, e.amount), 1, 0.82, 0.25, true)
+        GameTooltip:AddLine(string.format(L["Best %s food you can get (%s)"], e.label, ns.FoodValueText(e)), 1, 0.82, 0.25, true)
     else
         local bd = ns.ItemData(e.best.itemID)
-        GameTooltip:AddLine(string.format(L["Better: %s (+%d) by %s"], bd and bd.name or "?", e.best.amount, CrafterNames(e.best.crafters)), 1, 1, 1, true)
+        GameTooltip:AddLine(string.format(L["Better: %s (%s) by %s"], bd and bd.name or "?", ns.FoodValueText(e.best), CrafterNames(e.best.crafters)), 1, 1, 1, true)
     end
     GameTooltip:AddLine(L["Cooked by: "] .. CrafterNames(e.crafters), 1, 1, 1, true)
     GameTooltip:AddLine(L["Click: details · Shift-click: link"], 0.6, 0.6, 0.6)
@@ -1938,13 +1941,13 @@ local function RenderFood(e)
     if e.req and e.req > 1 then meta[#meta + 1] = L["requires level "] .. e.req end
     fd.meta:SetText(table.concat(meta, "  ·  "))
     fd.text:SetText(e.text or "")
-    fd.amount:SetText("+" .. e.amount)
+    fd.amount:SetText(ns.FoodValueText(e))
     fd.rank:SetText(e.rank == 1 and L["BEST"] or string.format(L["RANK %d"], e.rank))
     if e.rank == 1 then
         fd.best:SetText("|cffffd140" .. L["This is the best food in this category."] .. "|r")
     else
         local bd = ns.ItemData(e.best.itemID)
-        fd.best:SetText((bd and bd.name or "?") .. "  |cff5cdb6b+" .. e.best.amount .. "|r  ·  " .. CrafterNames(e.best.crafters))
+        fd.best:SetText((bd and bd.name or "?") .. "  |cff5cdb6b" .. ns.FoodValueText(e.best) .. "|r  ·  " .. CrafterNames(e.best.crafters))
     end
     for i, r in ipairs(fd.crafters) do
         local k = e.crafters[i]

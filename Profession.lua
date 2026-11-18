@@ -91,10 +91,15 @@ local function Build()
     if cooking then return BuildFood(map) end
     local me = ns.PlayerKey()
     local groups, order, total = {}, {}, 0
+    -- pro Spieler und Platz nur das beste Teil, das du mit diesem Beruf herstellen kannst
+    local best = ns.BestCraftable(ns.GetResults() or {}, function(e)
+        if not map[e.itemID] then return false end
+        for _, k in ipairs(e.crafters) do if k == me then return true end end
+        return false
+    end)
     for _, e in ipairs(ns.GetResults() or {}) do
-        if map[e.itemID] then
-            local mine = false
-            for _, k in ipairs(e.crafters) do if k == me then mine = true end end
+        if best[e] then
+            local mine = true
             if mine then
                 local g = groups[e.target]
                 if not g then
@@ -157,7 +162,7 @@ local function Render()
                 r.text:SetPoint("LEFT", 40, 0)
                 if e.food then
                     -- gold: niemand kann in dieser Kategorie Besseres kochen
-                    r.gain:SetText((e.rank == 1 and "|cffffd100" or "|cffb0b0b0") .. "+" .. e.amount .. "|r")
+                    r.gain:SetText((e.rank == 1 and "|cffffd100" or "|cffb0b0b0") .. ns.FoodValueText(e) .. "|r")
                 else
                     r.gain:SetText(st.DiffText(e))
                 end

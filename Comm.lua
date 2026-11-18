@@ -182,6 +182,9 @@ local function CharPayloads(key, what)
         -- Verzauberungsformeln (aeltere Versionen ignorieren "V")
         local ench = ns.EnchantPayload and ns.EnchantPayload(rec)
         if ench then list[#list + 1] = table.concat({ PROTO, "V", key, ench }, ";") end
+        -- Koch-Kategorien (aeltere Versionen ignorieren "C")
+        local cats = ns.FoodCatPayload and ns.FoodCatPayload(rec)
+        if cats then list[#list + 1] = table.concat({ PROTO, "C", key, cats }, ";") end
     end
     local digest
     if what == nil then
@@ -401,6 +404,8 @@ function ns.HandlePayload(sender, payload, channel)
         if ns.ParseHelp then ns.ParseHelp(rec, f) end
     elseif kind == "V" then
         if ns.ParseEnchants then ns.ParseEnchants(rec, f) end
+    elseif kind == "C" then
+        if ns.ParseFoodCats then ns.ParseFoodCats(rec, f) end
     elseif kind == "R" then
         local s = {}
         for id in (f[4] or ""):gmatch("%d+") do s[tonumber(id)] = true end

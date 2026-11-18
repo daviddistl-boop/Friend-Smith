@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.3
+- Buff food now uses the categories of the cooking window ("Stamina Food", "Agility Food" …), which WoW Forever already
+  sorts by buff. This works no matter how the tooltips are worded. Where the buff value isn't known, food is ranked by
+  required level. Cooks need to open their cooking window once after updating.
+- `/fsmith foodcheck` also shows how many recipes were found in buff food categories.
+- *I can craft* and the profession window panel now show only the best item you can craft per player and slot
+  (one shoulder for a player instead of three).
+
 ## 0.14.2
 - Fixed: the OneForAll leveling route in *Profession help* differed from OneForAll's own Skill-Up Helper.
   Friendsmith now uses the same settings (patterns from the auction house / from vendors), so it shows the same route.

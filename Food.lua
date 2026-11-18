@@ -166,14 +166,102 @@ function ns.FoodCheck()
     end
     ns.Print(string.format(L["Food check: %d buff food, %d without \"Well Fed\", %d without a Use line, %d not loaded yet."],
         counts.ok or 0, (counts.nowellfed or 0) + (counts.nostat or 0), (counts.nouse or 0) + (counts.notooltip or 0), counts.loading or 0))
+    local nc = 0
+    for _, h in pairs(rec and rec.foodCat or {}) do if ns.IsBuffCategory(h) then nc = nc + 1 end end
+    ns.Print(string.format(L["From the cooking window: %d recipes in buff food categories."], nc))
     for _, line in ipairs(samples) do ns.Print("  " .. line) end
     ns.MarkDirty()
+end
+
+---------------------------------------------------------------------------
+-- Kategorien aus dem Kochfenster ("Ausdauernahrung", "Stärkungsnahrung" …).
+-- WoW Forever sortiert die Rezepte schon nach Buff – das ist verlaesslicher als jeder Tooltip-Text.
+---------------------------------------------------------------------------
+local function CleanHeader(h) return ((h or ""):gsub("[;,=|]", ""):gsub("^%s+", ""):gsub("%s+$", "")) end
+
+-- Ist das eine Kategorie mit Buff-Essen? ("…nahrung" / "… Food", aber nicht Alltagsessen oder Lager)
+function ns.IsBuffCategory(h)
+    local low = (h or ""):lower()
+    if low == "" then return false end
+    if low:find("alltäglich", 1, true) or low:find("everyday", 1, true) or low:find("daily", 1, true)
+        or low:find("lager", 1, true) or low:find("camp", 1, true) then return false end
+    return low:find("nahrung", 1, true) ~= nil or low:find("food", 1, true) ~= nil
+end
+
+local function ReadCategories()
+    local out = {}
+    local T = C_TradeSkillUI
+    if T and T.GetAllRecipeIDs then
+        for _, rid in ipairs(T.GetAllRecipeIDs() or {}) do
+            local ok, info = pcall(T.GetRecipeInfo, rid)
+            if ok and type(info) == "table" and info.learned and info.categoryID and T.GetCategoryInfo then
+                local okc, cat = pcall(T.GetCategoryInfo, info.categoryID)
+                local itemID
+                if T.GetRecipeOutputItemData then
+                    local oko, o = pcall(T.GetRecipeOutputItemData, rid)
+                    itemID = oko and type(o) == "table" and o.itemID or nil
+                end
+                if okc and type(cat) == "table" and cat.name and itemID then out[itemID] = CleanHeader(cat.name) end
+            end
+        end
+    elseif GetNumTradeSkills then
+        local header
+        for i = 1, GetNumTradeSkills() do
+            local name, kind = GetTradeSkillInfo(i)
+            if kind == "header" or kind == "subheader" then
+                header = name
+            elseif kind then
+                local link = GetTradeSkillItemLink and GetTradeSkillItemLink(i)
+                local itemID = link and tonumber(link:match("item:(%d+)"))
+                if itemID and header then out[itemID] = CleanHeader(header) end
+            end
+        end
+    end
+    return out
+end
+
+-- Von ScanRecipes aufgerufen (nur im Kochfenster); true = geaendert
+function ns.RecordFoodCategories(rec)
+    if not (ns.IsCookingWindow and ns.IsCookingWindow()) then return false end
+    local found = ReadCategories()
+    rec.foodCat = rec.foodCat or {}
+    local changed = false
+    for itemID, h in pairs(found) do
+        if h ~= "" and rec.foodCat[itemID] ~= h then rec.foodCat[itemID] = h; changed = true end
+    end
+    return changed
+end
+
+-- Sync "C": "itemID=Kategorie,..." (nur Buff-Kategorien, sortiert)
+function ns.FoodCatPayload(rec)
+    local ids = {}
+    for id, h in pairs(rec.foodCat or {}) do if ns.IsBuffCategory(h) then ids[#ids + 1] = id end end
+    if #ids == 0 then return nil end
+    table.sort(ids)
+    local parts = {}
+    for _, id in ipairs(ids) do parts[#parts + 1] = id .. "=" .. rec.foodCat[id] end
+    return table.concat(parts, ",")
+end
+
+function ns.ParseFoodCats(rec, f)
+    local set, n = {}, 0
+    for id, h in (f[4] or ""):gmatch("(%d+)=([^,]+)") do
+        if n < 300 and #h <= 40 then set[tonumber(id)] = h; n = n + 1 end
+    end
+    rec.foodCat = n > 0 and set or nil
+end
+
+-- "+12" oder, wenn nur die Kategorie bekannt ist, die benoetigte Stufe
+function ns.FoodValueText(e)
+    if e.levelOnly then return L["lvl"] .. " " .. (e.req or "?") end
+    return "+" .. (e.amount or 0)
 end
 
 ---------------------------------------------------------------------------
 -- Liste: alle bekannten Buff-Essen, nach Kategorie, bestes zuerst
 ---------------------------------------------------------------------------
 local function CatOrder(cat)
+    if cat:sub(1, 2) == "h:" then return 50 end
     local first = cat:match("^[^+]+")
     for i, s in ipairs(STATS) do
         if s.key == first then return i end
@@ -194,15 +282,29 @@ function ns.FoodList()
         end
     end
     table.sort(keys)
+    -- Kategorien aus den Kochfenstern aller (Gilde, Freunde, eigene)
+    local catOf = {}
+    for _, rec in pairs(DB.chars) do
+        for id, h in pairs(rec.foodCat or {}) do catOf[id] = catOf[id] or h end
+    end
     for _, key in ipairs(keys) do
         for itemID in pairs(DB.chars[key].recipes) do
+            local header = catOf[itemID]
+            local byCat = header and ns.IsBuffCategory(header)
             local buff = ns.FoodBuff(itemID)
-            if buff then
+            if byCat or buff then
                 local e = foods[itemID]
                 if not e then
                     local d = ns.ItemData(itemID)
-                    e = { food = true, itemID = itemID, cat = buff.cat, label = buff.label,
-                          amount = buff.amount, text = buff.text, req = d and d.req or 0, crafters = {} }
+                    e = { food = true, itemID = itemID, req = d and d.req or 0, crafters = {},
+                          amount = buff and buff.amount or 0, text = buff and buff.text or nil }
+                    if byCat then
+                        -- Gruppe wie im Kochfenster; Rangfolge nach Buff-Wert, sonst nach Stufe
+                        e.cat, e.label = "h:" .. header:lower(), header
+                        e.levelOnly = not buff
+                    else
+                        e.cat, e.label = buff.cat, buff.label
+                    end
                     foods[itemID] = e
                 end
                 e.crafters[#e.crafters + 1] = key

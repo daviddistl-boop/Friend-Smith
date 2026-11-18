@@ -16,6 +16,10 @@ local LOCALE = GetLocale and GetLocale() or "enUS"
 if FriendsmithLocaleOverride then LOCALE = FriendsmithLocaleOverride end
 
 if LOCALE == "deDE" then
+    L["From the cooking window: %d recipes in buff food categories."] = "Aus dem Kochfenster: %d Rezepte in Buff-Essen-Kategorien."
+    L["lvl"] = "Stufe"
+    L["Best %s food you can get (%s)"] = "Bestes %s-Essen, das es gibt (%s)"
+    L["Better: %s (%s) by %s"] = "Besser: %s (%s) von %s"
     L["Food check: %d buff food, %d without \"Well Fed\", %d without a Use line, %d not loaded yet."] = "Essens-Check: %d Buff-Essen, %d ohne \"Satt\", %d ohne Benutzen-Zeile, %d noch nicht geladen."
     L["HELPED THIS WEEK"] = "DIESE WOCHE GEHOLFEN"
     L["Your help this week"] = "Deine Hilfe diese Woche"
