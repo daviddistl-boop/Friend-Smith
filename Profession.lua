@@ -26,8 +26,15 @@ local function SelectRecipe(itemID)
     local info = map and map[itemID]
     if not info then return end
     if info.recipeID then
+        -- modernes Berufsfenster (WoW Forever): direkt in dessen Rezeptliste auswaehlen.
+        -- C_TradeSkillUI.OpenRecipe ist dort fuer Addons gesperrt.
+        local page = ProfessionsFrame and ProfessionsFrame:IsShown() and ProfessionsFrame.CraftingPage
+        local list = page and page.RecipeList
         local T = C_TradeSkillUI
-        if T and T.OpenRecipe then pcall(T.OpenRecipe, info.recipeID) end
+        if list and type(list.SelectRecipe) == "function" and T and T.GetRecipeInfo then
+            local ok, rinfo = pcall(T.GetRecipeInfo, info.recipeID)
+            if ok and type(rinfo) == "table" then pcall(list.SelectRecipe, list, rinfo, true) end
+        end
         return
     end
     local i = info.index

@@ -17,6 +17,10 @@ local YELLOW_FACTOR = 2 -- gelbe Rezepte geben nur manchmal einen Punkt: grob do
 -- Aus dem offenen Berufsfenster lesen
 ---------------------------------------------------------------------------
 local function ProfInfo()
+    if GetTradeSkillLine and ns.ClassicList and ns.ClassicList() then
+        local name, rank, max = GetTradeSkillLine()
+        if name and name ~= "UNKNOWN" and rank then return name, rank, max end
+    end
     local T = C_TradeSkillUI
     if T and T.GetBaseProfessionInfo then
         local ok, info = pcall(T.GetBaseProfessionInfo)

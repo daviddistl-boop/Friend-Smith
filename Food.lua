@@ -42,7 +42,8 @@ local function IsWellFed(low)
 end
 
 local function Plain(t)
-    return (t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    -- Farbcodes entfernen: klassisch |cffRRGGBB und modern |cnIQ1: / |cnNAME:
+    return (t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:]*:", ""):gsub("|r", "")
 end
 
 ---------------------------------------------------------------------------
@@ -191,7 +192,7 @@ end
 local function ReadCategories()
     local out = {}
     local T = C_TradeSkillUI
-    if T and T.GetAllRecipeIDs then
+    if T and T.GetAllRecipeIDs and not ns.ClassicList() then
         for _, rid in ipairs(T.GetAllRecipeIDs() or {}) do
             local ok, info = pcall(T.GetRecipeInfo, rid)
             if ok and type(info) == "table" and info.learned and info.categoryID and T.GetCategoryInfo then

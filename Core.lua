@@ -14,6 +14,12 @@ local GetItemInfo        = (C_Item and C_Item.GetItemInfo) or GetItemInfo
 local GetItemInfoInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 local RequestLoad        = C_Item and C_Item.RequestLoadItemDataByID
 
+-- Moderne Clients (auch WoW Forever) melden fuer nicht anlegbare Gegenstaende einen eigenen "Platz"
+local function NoSlot(loc)
+    return loc == nil or loc == "" or loc == "INVTYPE_NON_EQUIP_IGNORE" or loc == "INVTYPE_NON_EQUIP"
+end
+ns.NoSlot = NoSlot
+
 local DEFAULTS = {
     minDiff    = 1,     -- mindestens so viele Itemlevel (bzw. Prozent bei Spec-Bewertung) besser
     useStats   = true,  -- nach Werten der Spezialisierung bewerten, sobald Talente verteilt sind
@@ -22,6 +28,7 @@ local DEFAULTS = {
     maxAgeDays = 30,    -- Gildendaten aelter als X Tage ignorieren
     anyArmor   = false, -- auch niedrigere Ruestungsklassen vorschlagen
     shareFriends = true, -- auch mit Freunden (Freundesliste) austauschen, die Friendsmith nutzen
+    theme      = "modern", -- Aussehen des Fensters: "modern" oder "classic"
     wishes     = false, -- "Ich freue mich ueber Hilfe": andere sehen von selbst, womit sie helfen koennten
     nudges     = true,  -- beim Login kurz zeigen, wem ich helfen koennte
     feedEvents = true,  -- eigene Meilensteine im Gilden-Feed teilen
@@ -79,7 +86,7 @@ function ns.ItemData(itemID)
     end
     c = {
         name = name, link = link, quality = quality, icon = icon,
-        ilvl = ilvl or 0, req = reqLevel or 0, loc = equipLoc,
+        ilvl = ilvl or 0, req = reqLevel or 0, loc = NoSlot(equipLoc) and "" or equipLoc,
         class = classID, sub = subclassID,
         typeName = typeName, subName = subName,
         bop = (bindType == 1), -- beim Aufheben gebunden: nur fuer den Handwerker selbst
@@ -430,6 +437,11 @@ end
 -- Ist gerade das Kochen-Fenster offen? (Fertigkeitslinie 185 bzw. Name des Zaubers "Kochkunst")
 local function IsCookingWindow()
     local cook = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(2550)) or (GetSpellInfo and GetSpellInfo(2550))
+    -- klassisches Fenster zuerst (Name der Fertigkeit, z. B. "Kochkunst")
+    if GetTradeSkillLine then
+        local name = GetTradeSkillLine()
+        if name and (name == cook or name == "Kochkunst" or name == "Cooking") then return true end
+    end
     local T = C_TradeSkillUI
     if T and T.GetBaseProfessionInfo then
         local ok, info = pcall(T.GetBaseProfessionInfo)
@@ -451,7 +463,7 @@ ns.IsCookingWindow = IsCookingWindow
 -- merken wir uns fuer Buff-Essen und Gildenlager
 local function IsSupply(itemID)
     local _, _, _, equipLoc, _, classID = GetItemInfoInstant(itemID)
-    return (classID == 0 or classID == 7) and (not equipLoc or equipLoc == "")
+    return (classID == 0 or classID == 7) and NoSlot(equipLoc)
 end
 
 local function AddRecipe(rec, itemID)
@@ -462,12 +474,33 @@ local function AddRecipe(rec, itemID)
     return 0
 end
 
+-- Eigene Auswertungen der Rezeptliste laufen ueber WithRawList (Schutz, falls ein Addon die Liste umleitet).
+-- sollen die unveraenderte Liste sehen: waehrend ns.rawTS > 0 reichen die Umleitungen alles durch.
+ns.rawTS = 0
+function ns.WithRawList(fn, ...)
+    ns.rawTS = ns.rawTS + 1
+    local ok, a, b, c = pcall(fn, ...)
+    ns.rawTS = ns.rawTS - 1
+    if not ok then error(a, 0) end
+    return a, b, c
+end
+
 -- Gelernte Rezepte des offenen Berufsfensters: itemID -> { recipeID = .. } oder { index = .. }.
 -- Gibt nil zurueck, wenn das Fenster einen fremden (verlinkten) Beruf zeigt.
-function ns.CurrentRecipes()
+local CurrentRecipesRaw
+function ns.CurrentRecipes() return ns.WithRawList(CurrentRecipesRaw) end
+
+-- WoW Forever hat das klassische Berufsfenster, kennt aber auch die modernen Berufs-Funktionen.
+-- Gibt es die klassische Liste (mit Kategorien wie "Ausdauernahrung"), hat sie Vorrang.
+function ns.ClassicList()
+    if not GetNumTradeSkills then return false end
+    local ok, n = pcall(GetNumTradeSkills)
+    return ok and (tonumber(n) or 0) > 0
+end
+function CurrentRecipesRaw()
     local map = {}
     local T = C_TradeSkillUI
-    if T and T.GetAllRecipeIDs then
+    if T and T.GetAllRecipeIDs and not ns.ClassicList() then
         -- moderner Berufsfenster-Weg
         if (T.IsTradeSkillLinked and T.IsTradeSkillLinked()) or (T.IsTradeSkillGuild and T.IsTradeSkillGuild()) then
             return nil
@@ -506,7 +539,9 @@ function ns.CurrentRecipes()
 end
 
 -- Liest die bekannten Rezepte aus dem offenen Berufsfenster.
-function ns.ScanRecipes(verbose)
+local ScanRecipesRaw
+function ns.ScanRecipes(verbose) return ns.WithRawList(ScanRecipesRaw, verbose) end
+function ScanRecipesRaw(verbose)
     if InCombatLockdown() then return end
     local DB = FriendsmithDB
     local rec = DB.chars[ns.PlayerKey()]

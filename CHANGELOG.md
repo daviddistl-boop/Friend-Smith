@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.0
+- **Classic look:** in *Settings → Window → Look* you can switch Friendsmith between the modern look and a classic
+  Blizzard look (dialog frame, gold accents, red buttons). Takes effect after a reload.
+- Fixed for WoW Forever: food, armor kits and other non-equippable crafts were never recorded (the client reports
+  them with a special "no slot" value). Buff food and guild stock now see them – open your profession windows once.
+- Fixed for WoW Forever: jumping to a recipe used a function Forever blocks for addons; Friendsmith now selects the
+  recipe directly in the profession window's list.
+- New command `/fsmith apicheck`: writes a report of what the game client provides (for development and bug reports).
+
 ## 0.14.7
 - Fixed: worn items with random bonuses ("… of the Falcon") were rated without those stats on WoW Forever, so worse
   items showed up as big upgrades (e.g. +286 %). Friendsmith now rates worn items by their full item link, including

@@ -25,6 +25,24 @@ local C = {
     gold      = { 1.00, 0.82, 0.25, 1 },
 }
 
+-- Klassisches Aussehen (Blizzard-Rahmen, goldene Akzente, rote Knoepfe). Wird beim Erstellen des Fensters
+-- angewendet; Umschalten braucht ein /reload.
+local CLASSIC = false
+local function ApplyTheme()
+    CLASSIC = ns.S and ns.S.theme == "classic"
+    if not CLASSIC then return end
+    C.bg        = { 0, 0, 0, 0 }
+    C.header    = { 0, 0, 0, 0.35 }
+    C.panel     = { 0.06, 0.05, 0.03, 0.55 }
+    C.panel2    = { 0.18, 0.13, 0.06, 0.9 }
+    C.border    = { 0.55, 0.45, 0.25, 1 }
+    C.accent    = { 1.00, 0.82, 0.00, 1 }
+    C.accentBg  = { 1.00, 0.82, 0.00, 0.14 }
+    C.accentBtn = { 0.50, 0.08, 0.04, 1 }
+    C.text      = { 1.00, 1.00, 1.00, 1 }
+    C.muted     = { 0.80, 0.74, 0.60, 1 }
+end
+
 local W, H = 880, 560
 local HEADER_H, STATUS_H, SIDEBAR_W, LIST_W = 48, 22, 184, 330
 local ROW_H = 22
@@ -110,6 +128,21 @@ local function AddTooltip(frame, title, body)
 end
 
 local function MakeButton(parent, w, h, label, accent)
+    if CLASSIC then
+        -- Blizzard-Knopf; "bg" faerbt nicht, sondern markiert die Auswahl ueber den Hervorhebungs-Effekt
+        local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+        b:SetSize(w, h)
+        b:SetText(label)
+        b.label = (b.GetFontString and b:GetFontString()) or Text(b, 11, C.text, "CENTER")
+        b.border = {}
+        b.bg = { SetColorTexture = function(_, r, g)
+            if r == C.accentBtn[1] and g == C.accentBtn[2] then b:LockHighlight() else b:UnlockHighlight() end
+        end }
+        function b:SetActive(on)
+            if on then self:Enable() else self:Disable() end
+        end
+        return b
+    end
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(w, h)
     b.bg = Fill(b, accent and C.accentBtn or C.panel2)
@@ -635,6 +668,10 @@ function Rebuild()
         nb.label:SetTextColor(on and 1 or C.text[1], on and 1 or C.text[2], on and 1 or C.text[3])
     end
     if stv then
+        for _, x in ipairs(stv.looks or {}) do
+            local on = (ns.S.theme or "modern") == x.value
+            x.b.bg:SetColorTexture(on and C.accentBtn[1] or C.panel2[1], on and C.accentBtn[2] or C.panel2[2], on and C.accentBtn[3] or C.panel2[3], 1)
+        end
         for _, t in ipairs(stv.toggles) do t:Update() end
         stv.diffValue:SetText("+" .. ns.S.minDiff)
     end
@@ -1532,7 +1569,7 @@ local function RenderOverview()
     local wishHints = ns.WishHints and ns.WishHints() or {}
     if #wishHints > 0 then
         local people = ns.WishPeople(wishHints)
-        local text = ns.WishHintText(wishHints[1]):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
+        local text = ns.WishHintText(wishHints[1]):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:]*:", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
         add("|cffff8fc8" .. string.format(people == 1 and L["%d guild member would be happy about help"] or L["%d guild members would be happy about help"], people) .. "|r",
             text, function() ns.Nudge(true) end)
     end
@@ -2712,30 +2749,50 @@ local function CreateSettingsView(parent)
     toggle(L["Profession window panel"], -182, function() return not ns.S.hideProfPanel end,
         function(v) ns.S.hideProfPanel = (not v) or nil; if ns.RefreshProfPanel then ns.RefreshProfPanel() end end,
         nil, L["Shows next to the profession window what you can craft with this profession, and for whom."])
-    toggle(L["Minimap button"], -204, function() return not (ns.S.minimap and ns.S.minimap.hide) end,
+    -- Aussehen
+    local lookLabel = Text(page, 11, C.text)
+    lookLabel:SetPoint("TOPLEFT", 18, -252)
+    lookLabel:SetText(L["Look"])
+    local function lookButton(label, value, x)
+        local b = MakeButton(page, 90, 20, label)
+        b:SetPoint("TOPLEFT", x, -248)
+        b.label:SetFont(FONT, 10, "")
+        b:SetScript("OnClick", function()
+            if (ns.S.theme or "modern") == value then return end
+            ns.S.theme = value
+            if StaticPopup_Show then StaticPopup_Show("FRIENDSMITH_RELOAD") else ns.Print(L["Takes effect after /reload."]) end
+            Rebuild()
+        end)
+        stv.looks = stv.looks or {}
+        stv.looks[#stv.looks + 1] = { b = b, value = value }
+        return b
+    end
+    lookButton(L["Modern"], "modern", 120)
+    lookButton(L["Classic"], "classic", 214)
+    toggle(L["Minimap button"], -226, function() return not (ns.S.minimap and ns.S.minimap.hide) end,
         function(v) ns.SetMinimapShown(v) end)
 
-    section(L["SHARING"], -236)
-    toggle(L["Share with friends"], -252, function() return ns.S.shareFriends end,
+    section(L["SHARING"], -280)
+    toggle(L["Share with friends"], -296, function() return ns.S.shareFriends end,
         function(v) ns.S.shareFriends = v; ns.MarkDirty(); if v then ns.Hello(true) end end, nil,
         L["Also exchanges data with people on your friend list who use Friendsmith, even if they aren't in your guild. Data is only accepted from people on your own friend list."])
-    toggle(L["Happy about help"], -274, function() return ns.S.wishes end,
+    toggle(L["Happy about help"], -318, function() return ns.S.wishes end,
         function(v) ns.SetWishes(v) end, nil,
         L["Friendsmith asks for you: guild members and friends see by themselves what they could craft for you or which mats you need for your profession. Nobody gets a message – they only see it in Friendsmith."])
-    toggle(L["Share my milestones in the guild feed"], -296, function() return ns.S.feedEvents ~= false end,
+    toggle(L["Share my milestones in the guild feed"], -340, function() return ns.S.feedEvents ~= false end,
         function(v) ns.S.feedEvents = v end, nil,
         L["Profession steps, level milestones and finished mat requests show up in the guild feed."])
 
-    section(L["HINTS"], -328)
-    toggle(L["Hints after login: who I could help"], -344, function() return ns.S.nudges ~= false end,
+    section(L["HINTS"], -372)
+    toggle(L["Hints after login: who I could help"], -388, function() return ns.S.nudges ~= false end,
         function(v) ns.S.nudges = v end, nil,
         L["A few lines in your own chat after login – an upgrade you could craft or mats someone needs."])
-    toggle(L["Ask to say thanks after trades"], -366, function() return ns.S.tradeThanks ~= false end,
+    toggle(L["Ask to say thanks after trades"], -410, function() return ns.S.tradeThanks ~= false end,
         function(v) ns.S.tradeThanks = v end)
 
-    section(L["DATA"], -398)
+    section(L["DATA"], -442)
     local clean = MakeButton(page, 150, 24, L["Clean up now"])
-    clean:SetPoint("TOPLEFT", 18, -414)
+    clean:SetPoint("TOPLEFT", 18, -458)
     clean:SetScript("OnClick", function() if ns.Cleanup then ns.Cleanup(true) end end)
     AddTooltip(clean, L["Clean up now"], L["Removes old data: characters who left the guild or haven't been seen for a long time, old feed entries, expired requests and unused mats lists. Happens automatically after login, too."])
     local reset = MakeButton(page, 150, 24, L["Delete others' data"])
@@ -2940,7 +2997,8 @@ end
 -- Fenster
 ---------------------------------------------------------------------------
 function CreateUI()
-    f = CreateFrame("Frame", "FriendsmithFrame", UIParent)
+    ApplyTheme()
+    f = CreateFrame("Frame", "FriendsmithFrame", UIParent, (CLASSIC and BackdropTemplateMixin) and "BackdropTemplate" or nil)
     f:SetSize(W, H)
     f:SetPoint("CENTER")
     f:SetFrameStrata("HIGH")
@@ -2950,8 +3008,18 @@ function CreateUI()
     f:EnableMouse(true)
     f:Hide()
     tinsert(UISpecialFrames, "FriendsmithFrame")
-    Fill(f, C.bg)
-    Border(f, { 0, 0, 0, 1 })
+    if CLASSIC and f.SetBackdrop then
+        f:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 32, edgeSize = 16,
+            insets = { left = 4, right = 4, top = 4, bottom = 4 },
+        })
+        f:SetBackdropBorderColor(1, 0.82, 0.3)
+    else
+        Fill(f, C.bg)
+        Border(f, { 0, 0, 0, 1 })
+    end
 
     CreateHeader()
     CreateSidebar()
@@ -3103,6 +3171,8 @@ SlashCmdList.FRIENDSMITH = function(msg)
         ns.Print(ns.S.nudges and L["Login hints on."] or L["Login hints off."])
     elseif msg == "help me" or msg == "helfen" then
         if (ns.Nudge(true) or 0) == 0 then ns.Print(L["Right now nobody needs anything you have."]) end
+    elseif msg == "apicheck" then
+        if ns.ApiCheck then ns.ApiCheck() end
     elseif msg == "foodcheck" or msg == "essen" then
         ns.FoodCheck()
     elseif msg == "debug" then
@@ -3171,4 +3241,14 @@ do
     elseif InterfaceOptions_AddCategory then
         pcall(InterfaceOptions_AddCategory, panel)
     end
+end
+
+if StaticPopupDialogs then
+    StaticPopupDialogs["FRIENDSMITH_RELOAD"] = {
+        text = L["Friendsmith's new look takes effect after reloading the interface. Reload now?"],
+        button1 = L["Reload"],
+        button2 = L["Later"],
+        OnAccept = function() if ReloadUI then ReloadUI() end end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    }
 end

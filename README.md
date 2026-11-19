@@ -28,6 +28,7 @@ Languages: English and German (follows your game client).
 
   The list is grouped by character (or by crafter) and collapsible, just like the profession window.
   The detail pane compares the item with what the character is wearing and has buttons to whisper a request or an offer – the item link is already filled in.
+- **Classic or modern look** for the Friendsmith window (Settings → Window → Look).
 - **Upgrades next to your profession window**, in the same style as the profession window: "Upgrades for you", "Upgrades for &lt;alt&gt;" and "Upgrades for &lt;guildmate&gt;" from the profession you have open.
   In the cooking window it lists your buff food by category instead – gold means nobody you know cooks anything better.
   Click to open the recipe, right-click to show it in the Friendsmith window.

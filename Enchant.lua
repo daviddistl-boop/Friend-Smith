@@ -69,6 +69,10 @@ end
 
 local function IsEnchantingWindow()
     local name = EnchantingName()
+    if GetTradeSkillLine then
+        local n = GetTradeSkillLine()
+        if n and (n == name or n == "Verzauberkunst" or n == "Enchanting") then return true end
+    end
     local T = C_TradeSkillUI
     if T and T.GetBaseProfessionInfo then
         local ok, info = pcall(T.GetBaseProfessionInfo)
@@ -89,7 +93,7 @@ end
 local function ReadEnchants()
     local out = {}
     local T = C_TradeSkillUI
-    if T and T.GetAllRecipeIDs then
+    if T and T.GetAllRecipeIDs and not ns.ClassicList() then
         for _, rid in ipairs(T.GetAllRecipeIDs() or {}) do
             local ok, info = pcall(T.GetRecipeInfo, rid)
             if ok and type(info) == "table" and info.learned then

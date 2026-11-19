@@ -16,6 +16,17 @@ local LOCALE = GetLocale and GetLocale() or "enUS"
 if FriendsmithLocaleOverride then LOCALE = FriendsmithLocaleOverride end
 
 if LOCALE == "deDE" then
+    L["Upgrades in the recipe list"] = "Upgrades in der Rezeptliste"
+    L["Shows \"Upgrades\" and \"Upgrades for <name>\" as categories at the top of the profession window's recipe list. Turn it off if another addon changes the list."] = "Zeigt \"Upgrades\" und \"Upgrades für <Name>\" als Kategorien oben in der Rezeptliste des Berufsfensters. Abschalten, falls ein anderes Addon die Liste verändert."
+    L["Look"] = "Aussehen"
+    L["Modern"] = "Modern"
+    L["Classic"] = "Klassisch"
+    L["Takes effect after /reload."] = "Wirkt nach /reload."
+    L["Friendsmith's new look takes effect after reloading the interface. Reload now?"] = "Das neue Aussehen von Friendsmith wirkt nach dem Neuladen der Oberfläche. Jetzt neu laden?"
+    L["Reload"] = "Neu laden"
+    L["Later"] = "Später"
+    L["Upgrades"] = "Upgrades"
+    L["Upgrades for %s"] = "Upgrades für %s"
     L["%s (class default – no talents found)"] = "%s (Klassen-Standard – keine Talente erkannt)"
     L["set bonus lost"] = "Setbonus geht verloren"
     L["Open the matching profession window – Friendsmith will jump straight to the recipe."] = "Öffne das passende Berufsfenster – Friendsmith springt dann direkt zum Rezept."
